@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}หน้าหลัก - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel hero-panel">
+  <div>
+    <h2>บริหารร้านก๋วยเตี๋ยวให้ไหลลื่นทุกโต๊ะ</h2>
+    <p>
+      POS NineKerl ช่วยให้ลูกค้าสั่งผ่าน QR ได้ทันที ครัวรับออเดอร์แบบเรียลไทม์
+      และผู้ดูแลติดตามยอดขายได้ครบจบในที่เดียว ทั้งหมดสร้างด้วย Python บน Flask
+      พร้อมขยายต่อยอดสู่โปรดักชันได้ง่าย
+    </p>
+    <div class="hero-actions">
+      <a class="button button-light" href="{{ url_for('main.table_menu', table_code=tables[0].code if tables else 'T1') }}" target="_blank" rel="noopener">ทดลองเปิดเมนูโต๊ะ</a>
+      <a class="button button-outline-light" href="{{ url_for('main.kitchen_dashboard') }}">เข้าสู่หน้าครัว</a>
+      <a class="button button-primary" href="{{ url_for('main.instant_game') }}" target="_blank" rel="noopener">เล่นเกมบีบมะนาว</a>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>โต๊ะในร้าน</h3>
+  <ul class="table-list">
+    {% for table in tables %}
+    <li>
+      <span class="table-name">{{ table.name }} ({{ table.code }})</span>
+      <span class="table-note">สแกนด้วย QR เพื่อให้ลูกค้าสั่งได้เอง</span>
+      <a class="button button-primary" href="{{ url_for('main.table_menu', table_code=table.code) }}" target="_blank" rel="noopener">เปิดเมนู</a>
+    </li>
+    {% else %}
+    <li>
+      <span class="table-name">ยังไม่มีข้อมูลโต๊ะ</span>
+      <span class="table-note">เพิ่มข้อมูลโต๊ะใหม่ในฐานข้อมูลเพียงไม่กี่คลิก</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel">
+  <h3>เริ่มต้นใช้งานอย่างรวดเร็ว</h3>
+  <ol class="steps">
+    <li>ตั้งค่าบัญชีเข้าสู่ระบบครัว/ผู้ดูแลในไฟล์ <code>.env</code> และรันแอป Flask</li>
+    <li>เรียกใช้สคริปต์สร้าง QR Code แล้วนำไฟล์ไปพิมพ์ติดที่โต๊ะ</li>
+    <li>ให้ลูกค้าสแกนและสั่งอาหารได้ทันที ครัวอัปเดตสถานะถึงขั้นเช็คบิล</li>
+    <li>ผู้ดูแลตรวจสอบยอดขายและออเดอร์ล่าสุดได้จากแดชบอร์ด</li>
+  </ol>
+</section>
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}เช็คบิลโต๊ะ - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>เช็คบิลตามโต๊ะ</h2>
+  <p>
+    เลือกโต๊ะเพื่อรวมยอดรายการที่ยังไม่ได้เก็บเงิน สร้าง QR PromptPay ตามยอดจริง
+    และยืนยันการชำระเมื่อได้รับเงินเรียบร้อย
+  </p>
+  {% if not promptpay_ready %}
+  <div class="callout warning">
+    <strong>เตือน:</strong>
+    {% if promptpay_target %}
+    หมายเลข PromptPay <strong>{{ promptpay_target }}</strong> ไม่อยู่ในรูปแบบที่ระบบรองรับ
+    {% else %}
+    ยังไม่ได้ตั้งค่าหมายเลข PromptPay สำหรับรับชำระเงิน
+    {% endif %}
+  </div>
+  {% elif promptpay_target %}
+  <p class="muted">PromptPay ปัจจุบัน: <strong>{{ promptpay_target }}</strong></p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>ภาพรวมโต๊ะ</h3>
+  {% if tables %}
+  <ul class="table-list">
+    {% for row in tables %}
+    <li>
+      <div>
+        <span class="table-name">{{ row.table.name }} ({{ row.table.code }})</span>
+        <span class="table-note">
+          {% if row.order_count %}
+          {{ row.order_count }} รายการค้างชำระ • {{ "%.2f"|format(row.total_due) }} ฿
+          {% else %}
+          ไม่มีรายการค้างชำระ
+          {% endif %}
+        </span>
+      </div>
+      <a class="button button-primary" href="{{ url_for('main.admin_billing_table_view', table_code=row.table.code) }}">
+        จัดการเช็คบิล
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>ยังไม่มีข้อมูลโต๊ะในระบบ</p>
+  {% endif %}
+</section>
+{% endblock %}

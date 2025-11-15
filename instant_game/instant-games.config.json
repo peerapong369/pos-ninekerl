@@ -1,0 +1,8 @@
+{
+  "instant_games": {
+    "platform_version": "RICH_GAMEPLAY",
+    "entry_point_handler": "default",
+    "orientation": "PORTRAIT",
+    "navigation_menu_version": "NAV_AUTO"
+  }
+}

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}POS NineKerl{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="container nav-bar">
+        <a class="brand" href="{{ url_for('main.home') }}">
+          <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="NineKerl Logo" class="brand-logo" />
+          <span>POS NineKerl</span>
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="เปิดเมนูนำทาง">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <nav class="nav-links">
+          <a class="nav-link" href="{{ url_for('main.home') }}">หน้าหลัก</a>
+          <a class="nav-link" href="{{ url_for('main.kitchen_dashboard') }}">ครัว</a>
+          <a class="nav-link" href="{{ url_for('main.admin_dashboard') }}">ผู้ดูแล</a>
+        </nav>
+        <div class="nav-actions">
+          {% if current_user %}
+          <span class="nav-user">สวัสดี {{ current_user.username }}</span>
+          <a class="button button-outline-light" href="{{ url_for('auth.logout') }}">ออกจากระบบ</a>
+          {% else %}
+          <a class="button button-light" href="{{ url_for('auth.login', role='kitchen', next=request.path) }}">เข้าสู่ระบบ</a>
+          {% endif %}
+        </div>
+      </div>
+    </header>
+    <main class="container">
+      {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+        <div class="flash-container">
+          {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+    <script>
+      (function () {
+        const navToggle = document.getElementById("navToggle");
+        const navBar = document.querySelector(".nav-bar");
+        const linkSelectors = [".nav-links a", ".nav-actions a"].join(",");
+        if (!navToggle || !navBar) {
+          return;
+        }
+        navToggle.addEventListener("click", () => {
+          navBar.classList.toggle("nav-open");
+        });
+
+        navBar.querySelectorAll(linkSelectors).forEach((link) => {
+          link.addEventListener("click", () => {
+            navBar.classList.remove("nav-open");
+          });
+        });
+      })();
+
+      (function () {
+        const role = "{{ current_user.roles|join(',') if current_user else 'guest' }}";
+        const isAdmin = role.includes("admin") || role.includes("kitchen");
+        const isTablePage = window.location.pathname.includes("/table/");
+        if (isAdmin || !isTablePage) {
+          return;
+        }
+        const timeout = 20 * 60 * 1000;
+        let timer = null;
+        const redirectToLogin = () => {
+          window.location.href = "{{ url_for('auth.login', role='kitchen') }}";
+        };
+        const resetTimer = () => {
+          clearTimeout(timer);
+          timer = setTimeout(redirectToLogin, timeout);
+        };
+        ["click", "touchstart", "mousemove", "keydown"].forEach((evt) => {
+          document.addEventListener(evt, resetTimer, { passive: true });
+        });
+        window.addEventListener("blur", resetTimer);
+        resetTimer();
+      })();
+    </script>
+  </body>
+</html>

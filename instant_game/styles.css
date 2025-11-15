@@ -1,0 +1,103 @@
+* {
+  box-sizing: border-box;
+  font-family: "Kanit", "Prompt", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.02em;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #fff8ea, #f6c17e);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+#game-container canvas {
+  background: #fff8ea !important;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+#game-container {
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 3 / 5;
+}
+
+#share-panel {
+  display: none;
+}
+#result-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 15, 15, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#result-overlay.visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+.result-card {
+  width: min(420px, 90%);
+  background: #fff7e3;
+  border-radius: 24px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.result-card h2 {
+  margin: 0;
+  font-size: 2rem;
+  color: #2f3d1e;
+}
+
+.result-card p {
+  margin: 0;
+  color: #4e342e;
+  font-size: 1.1rem;
+}
+
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.result-actions button {
+  width: 100%;
+  padding: 0.9rem;
+  border-radius: 999px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.result-actions button.share {
+  background: linear-gradient(135deg, #1b74e4, #36a6ff);
+  color: #fff;
+}
+
+.result-actions button.retry {
+  background: #fee4c4;
+  color: #2f3d1e;
+}
+
+#capture-preview {
+  width: 100%;
+  border-radius: 16px;
+  border: 2px dashed rgba(47, 61, 30, 0.3);
+  display: none;
+}

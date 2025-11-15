@@ -1,0 +1,62 @@
+<article class="order-card" data-order-id="{{ order.id }}">
+  <header>
+    <div>
+      <h3>โต๊ะ {{ order.table }} ({{ order.table_code }})</h3>
+      <time datetime="{{ order.created_at }}">รับออเดอร์: {{ order.created_at|replace("T", " ") }}</time>
+    </div>
+    <span class="status-label status-{{ order.status }}">{{ order.status_label }}</span>
+  </header>
+  <ul class="order-items">
+    {% for item in order["items"] %}
+    <li>
+      <span>{{ item.quantity }} x {{ item.name }}</span>
+      {% if item.note %}
+      <em class="note">หมายเหตุ: {{ item.note }}</em>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% if order.note %}
+  <p class="order-note">หมายเหตุจากลูกค้า: {{ order.note }}</p>
+  {% endif %}
+  <div class="order-finance">
+    <div>
+      <strong>ยอดรวม {{ "%.2f"|format(order.grand_total) }} ฿</strong>
+      {% if order.amount_paid %}
+      <span class="paid-amount">ชำระแล้ว {{ "%.2f"|format(order.amount_paid) }} ฿</span>
+      {% endif %}
+    </div>
+    {% if order.balance_due > 0 %}
+    <span class="badge badge-warning">ค้างชำระ {{ "%.2f"|format(order.balance_due) }} ฿</span>
+    {% else %}
+    <span class="badge badge-success">ชำระครบ</span>
+    {% endif %}
+  </div>
+  <footer>
+    <div class="order-status">
+      <label for="statusSelect{{ order.id }}">สถานะ:</label>
+      <select
+        id="statusSelect{{ order.id }}"
+        data-order-id="{{ order.id }}"
+        data-previous="{{ order.status }}"
+        {% if order.balance_due > 0 %}data-paid-disabled="true"{% endif %}
+      >
+        <option value="pending" {% if order.status == "pending" %}selected{% endif %}>รอทำ</option>
+        <option value="in_progress" {% if order.status == "in_progress" %}selected{% endif %}>กำลังทำ</option>
+        <option value="completed" {% if order.status == "completed" %}selected{% endif %}>เสิร์ฟแล้ว</option>
+        <option value="paid" {% if order.status == "paid" %}selected{% endif %}>เช็คบิลแล้ว</option>
+      </select>
+    </div>
+    <div class="order-actions">
+      <span class="status-hint">{{ order.status_hint }}</span>
+      <a
+        class="button button-small button-outline"
+        href="{{ url_for('main.admin_order_detail', order_id=order.id) }}"
+        target="_blank"
+        rel="noopener"
+      >
+        ดูรายละเอียด
+      </a>
+    </div>
+  </footer>
+</article>

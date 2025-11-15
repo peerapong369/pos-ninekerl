@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}ประวัติคลังวัตถุดิบ - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ประวัติความเคลื่อนไหวคลังวัตถุดิบ</h2>
+  <p>เรียงจากรายการล่าสุด (สูงสุด 200 รายการ)</p>
+</section>
+
+<section class="panel">
+  {% if movements %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>เวลา</th>
+        <th>วัตถุดิบ</th>
+        <th>ประเภท</th>
+        <th>จำนวน</th>
+        <th>หมายเหตุ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for movement in movements %}
+      <tr>
+        <td>{{ movement.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+        <td>{{ movement.ingredient.name }}</td>
+        <td>{{ movement.movement_type }}</td>
+        <td>{{ "%.2f"|format(movement.change) }} {{ movement.ingredient.unit }}</td>
+        <td>{{ movement.note or "-" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>ยังไม่มีข้อมูลความเคลื่อนไหว</p>
+  {% endif %}
+</section>
+{% endblock %}

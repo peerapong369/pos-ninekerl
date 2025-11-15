@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}ออเดอร์ #{{ order.id }} - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <header class="panel-header">
+    <div>
+      <h2>ออเดอร์ #{{ order.id }}</h2>
+      <p>โต๊ะ {{ order.table.name }} ({{ order.table.code }}) • รับออเดอร์เมื่อ {{ order.created_at.strftime("%Y-%m-%d %H:%M") }}</p>
+    </div>
+    <div class="order-status-chip status-{{ order.status }}">
+      {{ order_data.status_label }}
+    </div>
+  </header>
+  {% if order_data.status_hint %}
+  <p class="muted">{{ order_data.status_hint }}</p>
+  {% endif %}
+
+  {% if order.note %}
+  <div class="callout">
+    <strong>หมายเหตุจากลูกค้า:</strong> {{ order.note }}
+  </div>
+  {% endif %}
+
+  <div class="order-detail-grid">
+    <div>
+      <h3>รายการอาหาร</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>เมนู</th>
+            <th>จำนวน</th>
+            <th>ราคา/ที่</th>
+            <th>ราคารวม</th>
+            <th>หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in order.items %}
+          <tr>
+            <td>{{ item.menu_item.name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ "%.2f"|format(item.unit_price if item.unit_price is not none else item.menu_item.price) }} ฿</td>
+            <td>{{ "%.2f"|format(item.subtotal) }} ฿</td>
+            <td>{{ item.note or "-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <aside class="order-summary-card">
+      <h4>สรุปบิล</h4>
+      <ul>
+        <li><span>ยอดอาหาร</span><span>{{ "%.2f"|format(order.subtotal) }} ฿</span></li>
+        <li><span>ส่วนลด</span><span>-{{ "%.2f"|format(order.discount_amount) }} ฿</span></li>
+        <li><span>ค่าบริการ</span><span>{{ "%.2f"|format(order.service_charge) }} ฿</span></li>
+        <li><span>ภาษี ({{ "%.2f"|format(order.tax_rate) }}%)</span><span>{{ "%.2f"|format(order.tax_amount) }} ฿</span></li>
+        <li class="total"><span>ยอดรวมสุทธิ</span><strong>{{ "%.2f"|format(order.grand_total) }} ฿</strong></li>
+        <li><span>ชำระแล้ว</span><span>{{ "%.2f"|format(order.amount_paid) }} ฿</span></li>
+        <li>
+          <span>ยอดคงเหลือ</span>
+          <strong>
+            {% if order.balance_due > 0 %}
+            {{ "%.2f"|format(order.balance_due) }} ฿
+            {% else %}
+            <span class="badge badge-success">ชำระครบ</span>
+            {% endif %}
+          </strong>
+        </li>
+      </ul>
+      <div class="order-summary-actions">
+        <a class="button button-outline" href="{{ url_for('main.admin_order_receipt', order_id=order.id) }}" target="_blank" rel="noopener">ใบเสร็จ / พิมพ์</a>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-grid">
+    <div>
+      <h3>ปรับยอด / หมายเหตุ</h3>
+      <form class="form-grid" method="post" action="{{ url_for('main.admin_update_order', order_id=order.id) }}">
+        <label>
+          ส่วนลด (บาท)
+          <input type="number" step="0.01" name="discount_amount" value="{{ "%.2f"|format(order.discount_amount) }}" min="0" />
+        </label>
+        <label>
+          ค่าบริการ (บาท)
+          <input type="number" step="0.01" name="service_charge" value="{{ "%.2f"|format(order.service_charge) }}" min="0" />
+        </label>
+        <label>
+          ภาษี (%)
+          <input type="number" step="0.01" name="tax_rate" value="{{ "%.2f"|format(order.tax_rate) }}" min="0" />
+        </label>
+        <label class="full">
+          หมายเหตุเพิ่มเติม
+          <textarea name="note" rows="3" placeholder="ข้อความแจ้งพนักงานหรือครัวเพิ่มเติม">{{ order.note or "" }}</textarea>
+        </label>
+        <div class="form-actions full">
+          <button type="submit" class="button button-primary">บันทึกการปรับปรุง</button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <h3>บันทึกการชำระเงิน</h3>
+      {% if order.balance_due > 0 %}
+      <form class="form-grid" method="post" action="{{ url_for('main.admin_pay_order', order_id=order.id) }}">
+        <label>
+          จำนวนเงิน (บาท)
+          <input type="number" step="0.01" name="amount" min="0.01" value="{{ "%.2f"|format(order.balance_due) }}" required />
+        </label>
+        <label>
+          ช่องทางชำระ
+          <select name="method">
+            {% for method in payment_methods %}
+            <option value="{{ method.value }}">{{ payment_labels[method.value] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          เลขอ้างอิง (ถ้ามี)
+          <input type="text" name="reference" placeholder="เช่น หมายเลขสลิป PromptPay" />
+        </label>
+        <label class="full">
+          หมายเหตุการชำระเงิน
+          <textarea name="payment_note" rows="2" placeholder="ข้อมูลเพิ่มเติม เช่น ผู้รับเงิน"></textarea>
+        </label>
+        <div class="form-actions full">
+          <button type="submit" class="button button-primary">บันทึกการชำระเงิน</button>
+        </div>
+      </form>
+      {% else %}
+      <p class="muted">ออเดอร์นี้ชำระเงินครบเรียบร้อย</p>
+      {% endif %}
+
+      <h4>ประวัติการชำระ</h4>
+      {% if order.payments %}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>เวลา</th>
+            <th>จำนวน</th>
+            <th>ช่องทาง</th>
+            <th>เลขอ้างอิง</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in order.payments %}
+          <tr>
+            <td>{{ payment.paid_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>{{ "%.2f"|format(payment.amount) }} ฿</td>
+            <td>{{ payment_labels.get(payment.method, payment.method) }}</td>
+            <td>{{ payment.reference or "-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">ยังไม่มีการบันทึกการชำระเงิน</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

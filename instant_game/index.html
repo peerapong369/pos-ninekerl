@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lemon Squeeze Challenge</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <script src="https://connect.facebook.net/en_US/fbinstant.6.3.js"></script>
+    <script>
+      window.fbAsyncInit = function () {
+        if (window.FBInstant) {
+          FBInstant.initializeAsync().then(function () {
+            FBInstant.setLoadingProgress(100);
+            FBInstant.startGameAsync();
+          });
+        }
+      };
+    </script>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <div id="result-overlay">
+      <div class="result-card">
+        <h2 id="overlay-title">ภารกิจไม่สำเร็จ</h2>
+        <p id="overlay-description">แตะมะนาวใหม่แล้วลองอีกครั้ง!</p>
+        <div class="result-actions">
+          <img id="capture-preview" alt="capture preview" />
+          <button class="share" id="share-result-btn">ดาวน์โหลดภาพ</button>
+          <button class="retry" id="copy-link-btn">คัดลอกลิงก์เกม</button>
+          <button class="retry" id="retry-btn">เล่นอีกครั้ง</button>
+        </div>
+      </div>
+    </div>
+    <script src="game.js" defer></script>
+  </body>
+</html>

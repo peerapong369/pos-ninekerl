@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}หน้าครัว - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ออเดอร์เข้าครัว</h2>
+  <p>ระบบจะอัปเดตออเดอร์ใหม่อัตโนมัติทุก 5 วินาที พร้อมเสียงแจ้งเตือนเมื่อมีออเดอร์ใหม่</p>
+</section>
+
+<section class="orders-grid" id="kitchenOrders">
+  {% for order in orders %}
+    {% include "partials/order_card.html" with context %}
+  {% else %}
+  <p>ยังไม่มีออเดอร์</p>
+  {% endfor %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.KITCHEN_INITIAL_ORDERS = {{ orders | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/kitchen.js') }}"></script>
+{% endblock %}

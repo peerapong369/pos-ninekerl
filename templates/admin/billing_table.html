@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}เช็คบิล {{ table.name }} - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <header class="panel-header">
+    <div>
+      <h2>เช็คบิลโต๊ะ {{ table.name }} ({{ table.code }})</h2>
+      <p>เลือกรายการที่ยังไม่ได้เก็บเงิน เพื่อสร้าง QR PromptPay รวมยอดและยืนยันการชำระ</p>
+    </div>
+    <a class="button button-outline" href="{{ url_for('main.admin_billing_overview') }}">ย้อนกลับ</a>
+  </header>
+  {% if promptpay_target %}
+  <p class="muted">PromptPay สำหรับรับชำระ: <strong>{{ promptpay_target }}</strong></p>
+  {% else %}
+  <div class="callout warning">
+    <strong>เตือน:</strong> ยังไม่ได้ตั้งค่าหมายเลข PromptPay จะไม่สามารถสร้าง QR ได้
+  </div>
+  {% endif %}
+</section>
+
+{% if not orders %}
+<section class="panel">
+  <p>ไม่มีรายการค้างชำระสำหรับโต๊ะนี้</p>
+</section>
+{% else %}
+<form id="settleForm" class="panel" method="post" action="{{ url_for('main.admin_settle_billing_orders', table_code=table.code) }}">
+  <input type="hidden" name="order_ids" id="selectedOrderIds" />
+  <section>
+    <h3>รายการที่ยังไม่ปิดบิล</h3>
+    <div class="table-wrapper">
+      <table class="data-table billing-table">
+        <thead>
+          <tr>
+            <th>เลือก</th>
+            <th>ออเดอร์</th>
+            <th>เมนู / หมายเหตุ</th>
+            <th>ยอดรวม</th>
+            <th>สถานะ</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+          {% set due = "%.2f"|format(order.balance_due) %}
+          <tr
+            class="billing-row"
+            data-order-id="{{ order.id }}"
+            data-balance="{{ due }}"
+            data-status="{{ order.status }}"
+          >
+            <td>
+              <input
+                type="checkbox"
+                class="order-select"
+                value="{{ order.id }}"
+                {% if order.balance_due <= 0 %}
+                disabled
+                {% endif %}
+              />
+            </td>
+            <td>
+              <strong>#{{ order.id }}</strong><br />
+              <small>{{ order.created_at.strftime("%Y-%m-%d %H:%M") }}</small>
+            </td>
+            <td>
+              <ul class="compact-list">
+                {% for item in order.items %}
+                <li>
+                  <div>
+                    {{ item.quantity }} x {{ item.menu_item.name }}
+                    <small class="item-meta">{{ "%.2f"|format(item.unit_price if item.unit_price is not none else item.menu_item.price) }} ฿ / ที่</small>
+                  </div>
+                  {% if item.note %}
+                  <em>(หมายเหตุ: {{ item.note }})</em>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% if order.note %}
+              <small>หมายเหตุเพิ่มเติม: {{ order.note }}</small>
+              {% endif %}
+            </td>
+            <td>
+              <strong>{{ "%.2f"|format(order.grand_total) }} ฿</strong><br />
+              {% if order.amount_paid %}
+              <small>ชำระแล้ว {{ "%.2f"|format(order.amount_paid) }} ฿</small><br />
+              {% endif %}
+              {% if order.balance_due > 0 %}
+              <span class="badge badge-warning">ค้างชำระ {{ "%.2f"|format(order.balance_due) }} ฿</span>
+              {% else %}
+              <span class="badge badge-success">ชำระครบ</span>
+              {% endif %}
+            </td>
+            <td>{{ status_labels.get(order.status, order.status) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="billing-summary" id="billingSummary">
+      <p>ยังไม่ได้เลือกรายการ</p>
+    </div>
+    <div class="billing-actions">
+      <button type="button" class="button button-outline" id="clearSelectionBtn">ล้างรายการ</button>
+      <button type="button" class="button button-primary" id="generateQrBtn" {% if not promptpay_ready %}disabled{% endif %}>
+        สร้าง QR PromptPay
+      </button>
+      <button type="submit" class="button button-primary" id="confirmPaidBtn" disabled>
+        ยืนยันรับชำระ / ปิดบิล
+      </button>
+    </div>
+    <div class="billing-reference">
+      <label>
+        หมายเลขอ้างอิง (ถ้ามี)
+        <input type="text" name="reference" placeholder="เช่น หมายเลขสลิป" />
+      </label>
+    </div>
+    <div class="qr-preview" id="qrPreview" hidden>
+      <div class="qr-preview__image">
+        <img id="qrImage" alt="PromptPay QR" />
+      </div>
+      <div class="qr-preview__meta">
+        <p><strong>ยอดรวม:</strong> <span id="qrAmount"></span> บาท</p>
+        <p class="muted">ลูกค้าสแกนและชำระตามยอดนี้ จากนั้นกดยืนยันปิดบิล</p>
+        <button type="button" class="button button-small" id="downloadQrBtn">ดาวน์โหลด QR</button>
+      </div>
+    </div>
+  </section>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.BILLING_PAGE = {
+    tableCode: "{{ table.code }}",
+    promptpayReady: {{ "true" if promptpay_ready else "false" }},
+  };
+</script>
+<script src="{{ url_for('static', filename='js/billing.js') }}"></script>
+{% endblock %}

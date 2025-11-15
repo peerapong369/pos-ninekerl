@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}เมนูสำหรับ {{ table.name }} - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>เมนูสำหรับ {{ table.name }} ({{ table.code }})</h2>
+  <p>เลือกเมนูที่ต้องการแล้วกดส่งออเดอร์เข้าครัวได้เลย</p>
+  <a class="button button-outline" href="{{ url_for('main.instant_game') }}" target="_blank" rel="noopener">เล่นเกมบีบมะนาวรับส่วนลด</a>
+</section>
+
+<div class="menu-layout">
+  <section class="menu-list">
+    {% for category in categories %}
+      {% set available_items = category.items | selectattr("is_available") | list %}
+      {% if available_items %}
+      <div class="menu-category">
+        <h3>{{ category.name }}</h3>
+        <ul class="menu-category__grid">
+          {% for item in available_items %}
+          {% set config = menu_configs.get(item.id) %}
+          {% set has_config = config and ((config.groups and config.groups|length > 0) or config.special) %}
+          {% set fallback_image = url_for('static', filename=item.image_path) if item.image_path else None %}
+          {% set display_image = (config.image if config and config.image else fallback_image) %}
+          {% set display_alt = config.image_alt if config and config.image_alt else item.name %}
+          <li
+            class="menu-card{% if has_config %} menu-card--featured{% endif %}"
+            data-item-id="{{ item.id }}"
+            data-item-price="{{ "%.2f"|format(item.price) }}"
+            data-item-name="{{ item.name }}"
+            data-item-description="{{ (item.description or '')|e }}"
+            {% if display_image %}data-item-image="{{ display_image }}"{% endif %}
+            {% if has_config %}data-has-config="true"{% endif %}
+          >
+            <div class="menu-card__header">
+              {% if display_image %}
+              <div class="menu-card__image">
+                <img src="{{ display_image }}" alt="{{ display_alt }}" loading="lazy" />
+              </div>
+              {% endif %}
+              <div class="menu-card__price">
+                <span class="menu-card__price-label">ราคา</span>
+                <strong>{{ "%.2f"|format(item.price) }} ฿</strong>
+              </div>
+            </div>
+            <div class="menu-card__body">
+              <h4 class="menu-card__title">{{ item.name }}</h4>
+              {% if item.description %}
+              <p class="menu-card__description">{{ item.description }}</p>
+              {% endif %}
+              {% if config and config.special %}
+              <p class="menu-card__highlight">เลือกเพิ่ม “พิเศษ” +{{ "%.2f"|format(config.special.price_delta) }} ฿</p>
+              {% endif %}
+              {% if config and config.groups %}
+              <ul class="menu-card__badges">
+                {% for group in config.groups %}
+                <li>{{ group.name }}</li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+              <button class="button button-primary button-block" data-action="add">
+                {% if has_config %}กำหนดตัวเลือก{% else %}เพิ่มลงตะกร้า{% endif %}
+              </button>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    {% else %}
+    <p>ขณะนี้ยังไม่มีเมนูในระบบ</p>
+    {% endfor %}
+  </section>
+
+  <section class="order-cart" id="orderCart">
+    <h3>ออเดอร์ของคุณ</h3>
+    <ul id="orderItems"></ul>
+    <div class="order-summary">
+      <label for="orderNote">หมายเหตุ</label>
+      <textarea id="orderNote" rows="3" placeholder="ถ้ามีคำสั่งเพิ่มเติม กรุณาระบุที่นี่"></textarea>
+      <div class="summary-row">
+        <span>ยอดรวม</span>
+        <strong id="orderTotal">0.00 ฿</strong>
+      </div>
+    </div>
+    <button class="button button-primary" id="submitOrder" disabled>ส่งออเดอร์</button>
+    <p class="status" id="orderStatus"></p>
+    <div class="active-orders" id="activeOrdersSection" hidden>
+      <h4>คำสั่งซื้อปัจจุบัน</h4>
+      <div class="tracking-list" id="activeOrders"></div>
+    </div>
+  </section>
+</div>
+
+<div class="menu-modal" id="menuCustomizer" hidden>
+  <div class="menu-modal__backdrop" data-dismiss="modal"></div>
+  <div class="menu-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="customizerTitle">
+    <button type="button" class="menu-modal__close" id="customizerClose" aria-label="ปิดหน้าต่าง">&times;</button>
+    <header class="menu-modal__header">
+      <div>
+        <h3 id="customizerTitle"></h3>
+        <p class="muted" id="customizerSubtitle"></p>
+      </div>
+      <img id="customizerImage" class="menu-modal__image" alt="" hidden />
+    </header>
+    <div class="menu-modal__body">
+      <div id="optionGroupsContainer"></div>
+      <section class="modal-section" id="specialSection" hidden>
+        <h4>เพิ่มความพิเศษ</h4>
+        <label class="checkbox special-option">
+          <input type="checkbox" id="specialToggle" />
+          <span id="specialLabel">เลือกแบบพิเศษ</span>
+        </label>
+      </section>
+      <section class="modal-section">
+        <h4>จำนวน</h4>
+        <div class="quantity-control">
+          <button type="button" class="button button-outline" id="customizerDecrease">-</button>
+          <span id="customizerQuantity">1</span>
+          <button type="button" class="button button-outline" id="customizerIncrease">+</button>
+        </div>
+      </section>
+    </div>
+    <footer class="menu-modal__footer">
+      <div class="modal-price">
+        <span>ราคาต่อชาม</span>
+        <strong id="customizerPrice">0.00 ฿</strong>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="button button-outline" id="customizerCancel">ยกเลิก</button>
+        <button type="button" class="button button-primary" id="customizerAdd">เพิ่มลงตะกร้า</button>
+      </div>
+    </footer>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tableCode = "{{ table.code }}";
+  window.MENU_CONFIGS = {{ menu_configs | tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/table.js') }}"></script>
+{% endblock %}

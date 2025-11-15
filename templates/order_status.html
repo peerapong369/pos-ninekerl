@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}ติดตามออเดอร์ #{{ order.id }} - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ติดตามออเดอร์ #{{ order.id }}</h2>
+  <p>โต๊ะ {{ order.table }} ({{ order.table_code }})</p>
+  <div class="tracking-box">
+    <span class="status-label status-{{ order.status }}">{{ order.status_label }}</span>
+    <p>{{ order.status_hint }}</p>
+    <ul class="tracking-history">
+      <li>รับออเดอร์เมื่อ {{ order.created_at.replace("T", " ") }}</li>
+      {% if order.note %}
+      <li>หมายเหตุ: {{ order.note }}</li>
+      {% endif %}
+      {% if order.paid_at %}
+      <li>ชำระเงินเมื่อ {{ order.paid_at.replace("T", " ") }}</li>
+      {% endif %}
+    </ul>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>รายการที่สั่ง</h3>
+  <ul class="order-items">
+    {% for item in order["items"] %}
+    <li>
+      <span>{{ item.quantity }} x {{ item.name }}</span>
+      <span>{{ "%.2f"|format(item.subtotal) }} ฿</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <div class="order-summary">
+    <div>
+      <span>ยอดอาหาร</span>
+      <strong>{{ "%.2f"|format(order.subtotal) }} ฿</strong>
+    </div>
+    {% if order.discount > 0 %}
+    <div>
+      <span>ส่วนลด</span>
+      <strong>-{{ "%.2f"|format(order.discount) }} ฿</strong>
+    </div>
+    {% endif %}
+    {% if order.service_charge > 0 %}
+    <div>
+      <span>ค่าบริการ</span>
+      <strong>{{ "%.2f"|format(order.service_charge) }} ฿</strong>
+    </div>
+    {% endif %}
+    {% if order.tax_amount > 0 %}
+    <div>
+      <span>ภาษี ({{ "%.2f"|format(order.tax_rate) }}%)</span>
+      <strong>{{ "%.2f"|format(order.tax_amount) }} ฿</strong>
+    </div>
+    {% endif %}
+    <div class="total-line">
+      <span>ยอดรวมสุทธิ</span>
+      <strong>{{ "%.2f"|format(order.grand_total) }} ฿</strong>
+    </div>
+    <div>
+      <span>ชำระแล้ว</span>
+      <strong>{{ "%.2f"|format(order.amount_paid) }} ฿</strong>
+    </div>
+    <div>
+      <span>ยอดคงเหลือ</span>
+      <strong>
+        {% if order.balance_due > 0 %}
+        {{ "%.2f"|format(order.balance_due) }} ฿
+        {% else %}
+        <span class="badge badge-success">ชำระครบ</span>
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+</section>
+{% endblock %}

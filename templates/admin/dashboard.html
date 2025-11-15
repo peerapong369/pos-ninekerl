@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}แดชบอร์ดผู้ดูแล - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ภาพรวมร้าน</h2>
+  <div class="admin-grid">
+    <div class="metric-card">
+      <h4>คำสั่งซื้อทั้งหมด</h4>
+      <strong>{{ stats.total_orders }}</strong>
+    </div>
+    <div class="metric-card">
+      <h4>รอทำ</h4>
+      <strong>{{ stats.pending }}</strong>
+    </div>
+    <div class="metric-card">
+      <h4>กำลังทำ</h4>
+      <strong>{{ stats.in_progress }}</strong>
+    </div>
+    <div class="metric-card">
+      <h4>เสิร์ฟแล้ว</h4>
+      <strong>{{ stats.completed }}</strong>
+    </div>
+    <div class="metric-card">
+      <h4>เช็คบิลแล้ว</h4>
+      <strong>{{ stats.paid }}</strong>
+    </div>
+    <div class="metric-card">
+      <h4>ยอดขายรวม (บาท)</h4>
+      <strong>{{ "%.2f"|format(stats.total_sales) }}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="panel quick-actions">
+  <h3>เมนูทางลัด</h3>
+  <div class="quick-actions-grid">
+    <a class="button button-primary" href="{{ url_for('main.admin_manage_tables') }}">จัดการโต๊ะ</a>
+    <a class="button button-primary" href="{{ url_for('main.admin_manage_menu') }}">จัดการเมนู</a>
+    <a class="button button-primary" href="{{ url_for('main.admin_stock_dashboard') }}">คลังวัตถุดิบ</a>
+    <a class="button button-primary" href="{{ url_for('main.admin_billing_overview') }}">เช็คบิลโต๊ะ</a>
+    <a class="button button-primary" href="{{ url_for('main.admin_reports') }}">รายงานยอดขาย</a>
+    <a class="button button-outline" href="{{ url_for('main.admin_insights') }}">สถิติเชิงลึก</a>
+    <a class="button button-outline" href="{{ url_for('main.kitchen_dashboard') }}" target="_blank" rel="noopener">เปิดหน้าครัว</a>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>เมนูขายดี</h3>
+  {% if top_items %}
+  <ul class="table-list">
+    {% for name, qty in top_items %}
+    <li>
+      <span class="table-name">{{ name }}</span>
+      <span>{{ qty }} ที่</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>ยังไม่มีข้อมูลยอดขาย</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>QR สำหรับรับชำระเงิน</h3>
+  <p>สแกนหรือดาวน์โหลด QR PromptPay เพื่อรับชำระเงินเช็คบิล</p>
+  {% if request.args.get("error") %}
+  <p class="form-error">{{ request.args.get("error") }}</p>
+  {% endif %}
+  <div class="qr-payment">
+    {% if promptpay_exists %}
+    <img src="{{ url_for('static', filename='promptpay.png') }}" alt="PromptPay QR" />
+    {% else %}
+    <div class="qr-placeholder">
+      <span>ดาวน์โหลดไฟล์ QR เพื่อใช้งาน</span>
+    </div>
+    {% endif %}
+    <div class="qr-actions">
+      <a class="button button-primary" href="{{ url_for('main.download_promptpay_qr') }}">ดาวน์โหลด QR</a>
+      <p class="qr-note">หมายเลข PromptPay: <strong>082-329-3693</strong></p>
+      <small>คำสั่ง: <code>python scripts/generate_promptpay_qr.py --output static/promptpay.png</code></small>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>ออเดอร์ล่าสุด</h3>
+  {% if recent_orders %}
+  <div class="table-wrapper">
+    <table class="recent-orders-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>โต๊ะ</th>
+          <th>สถานะ</th>
+          <th>จำนวนเมนู</th>
+          <th>ยอดรวม</th>
+          <th>เวลา</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order in recent_orders %}
+        <tr>
+          <td><a href="{{ url_for('main.order_status_page', order_id=order.id) }}">#{{ order.id }}</a></td>
+          <td>{{ order.table }}</td>
+          <td>{{ order.status_label }}</td>
+          <td>{{ order["items"] | length }}</td>
+          <td>{{ "%.2f"|format(order.total) }}</td>
+          <td>{{ order.created_at.replace("T", " ") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>ยังไม่มีคำสั่งซื้อ</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="panel-header">
+    <h3>บิลล่าสุด ({{ stats.invoice_count }})</h3>
+    <div class="panel-header-actions">
+      <a class="button button-outline" href="{{ url_for('main.export_invoices_csv') }}">ส่งออก CSV</a>
+      <a class="button button-outline" href="{{ url_for('main.admin_invoices') }}">ดูทั้งหมด</a>
+    </div>
+  </div>
+  {% if recent_invoices %}
+  <div class="table-wrapper">
+    <table class="recent-orders-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>ออเดอร์</th>
+          <th>โต๊ะ</th>
+          <th>มูลค่าสินค้า</th>
+          <th>ภาษี (7%)</th>
+          <th>ยอดรวม</th>
+          <th>เวลา</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in recent_invoices %}
+        <tr>
+          <td>#{{ invoice.id }}</td>
+          <td>#{{ invoice.order_id }}</td>
+          <td>{{ invoice.order.table.name }}</td>
+          <td>{{ "%.2f"|format(invoice.net_amount) }}</td>
+          <td>{{ "%.2f"|format(invoice.tax_amount) }}</td>
+          <td>{{ "%.2f"|format(invoice.total_amount) }}</td>
+          <td>{{ invoice.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td><a class="button button-small" href="{{ url_for('main.download_invoice', invoice_id=invoice.id) }}">ดาวน์โหลด</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>ยังไม่มีบิลที่ถูกบันทึก</p>
+  {% endif %}
+</section>
+{% endblock %}

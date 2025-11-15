@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}บิลทั้งหมด - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>บิลทั้งหมด</h2>
+      <p class="muted">รวม {{ invoices|length }} บิลที่บันทึกเมื่อเช็คบิลสำเร็จ</p>
+    </div>
+    <div class="panel-header-actions">
+      <a class="button button-outline" href="{{ url_for('main.export_invoices_csv') }}">ส่งออก CSV</a>
+      <a class="button button-outline" href="{{ url_for('main.admin_dashboard') }}">ย้อนกลับแดชบอร์ด</a>
+    </div>
+  </div>
+  {% if invoices %}
+  <div class="table-wrapper">
+    <table class="recent-orders-table">
+      <thead>
+        <tr>
+          <th>บิล</th>
+          <th>ออเดอร์</th>
+          <th>โต๊ะ</th>
+          <th>มูลค่าสินค้า</th>
+          <th>ภาษี 7%</th>
+          <th>ยอดรวม</th>
+          <th>สร้างเมื่อ</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+        <tr>
+          <td>#{{ invoice.id }}</td>
+          <td>#{{ invoice.order_id }}</td>
+          <td>{{ invoice.order.table.name }} ({{ invoice.order.table.code }})</td>
+          <td>{{ "%.2f"|format(invoice.net_amount) }} ฿</td>
+          <td>{{ "%.2f"|format(invoice.tax_amount) }} ฿</td>
+          <td>{{ "%.2f"|format(invoice.total_amount) }} ฿</td>
+          <td>{{ invoice.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+          <td>
+            <a class="button button-small" href="{{ url_for('main.download_invoice', invoice_id=invoice.id) }}">
+              ดาวน์โหลด
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>ยังไม่มีบิลที่ถูกบันทึก</p>
+  {% endif %}
+</section>
+{% endblock %}

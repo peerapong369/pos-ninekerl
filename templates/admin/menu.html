@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+
+{% block title %}จัดการเมนู - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>จัดการเมนู</h2>
+  <p>เพิ่ม/แก้ไขเมนู ประเภทอาหาร และกำหนดวัตถุดิบที่ใช้ในแต่ละจานเพื่อเชื่อมกับระบบสต๊อก</p>
+</section>
+
+<section class="panel">
+  <div class="panel-grid">
+    <div>
+      <h3>เพิ่มหมวดหมู่</h3>
+      <form class="form-grid" method="post" action="{{ url_for('main.admin_create_category') }}">
+        <label>
+          ชื่อหมวดหมู่
+          <input type="text" name="name" required />
+        </label>
+        <label>
+          ลำดับ (ตัวเลขน้อยอยู่ก่อน)
+          <input type="number" name="position" min="0" value="0" />
+        </label>
+        <div class="form-actions full">
+          <button type="submit" class="button button-primary">เพิ่มหมวดหมู่</button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <h3>เพิ่มเมนูใหม่</h3>
+      <form class="form-grid" method="post" action="{{ url_for('main.admin_create_menu_item') }}" enctype="multipart/form-data">
+        <label>
+          ชื่อเมนู
+          <input type="text" name="name" required />
+        </label>
+        <label>
+          ราคา (บาท)
+          <input type="number" step="0.01" min="0" name="price" required />
+        </label>
+        <label>
+          ราคาเพิ่มสำหรับ "พิเศษ" (บาท)
+          <input type="number" step="0.01" min="0" name="special_price_delta" value="0" />
+          <small class="muted">ระบุเมื่อมีตัวเลือกพิเศษ เช่น เพิ่มเส้น/เพิ่มเครื่อง</small>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" name="allow_special" />
+          เปิดให้ลูกค้าเลือก “พิเศษ” สำหรับเมนูนี้
+        </label>
+        <label>
+          หมวดหมู่
+          <select name="category_id" required>
+            <option value="">เลือกหมวดหมู่</option>
+            {% for category in categories %}
+            <option value="{{ category.id }}">{{ category.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          ลำดับในหมวด
+          <input type="number" name="position" min="0" value="0" />
+        </label>
+        <label class="full">
+          คำอธิบาย (แสดงในหน้าเมนู)
+          <textarea name="description" rows="2"></textarea>
+        </label>
+        <label class="full">
+          รูปภาพเมนู (ไฟล์ .jpg, .png, .webp หรือ .svg)
+          <input type="file" name="image" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
+        </label>
+        <div class="form-actions full">
+          <button type="submit" class="button button-primary">เพิ่มเมนู</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>รายการเมนูทั้งหมด</h3>
+  {% if categories %}
+  {% for category in categories %}
+  <div class="admin-category">
+    <header class="admin-category-header">
+      <h4>{{ category.name }}</h4>
+      <span class="muted">เรียงลำดับ: {{ category.position }}</span>
+    </header>
+    {% if category.items %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>รูป</th>
+          <th>เมนู</th>
+          <th>ราคา</th>
+          <th>พิเศษ</th>
+          <th>ลำดับ</th>
+          <th>พร้อมขาย</th>
+          <th>คำอธิบาย</th>
+          <th>ดำเนินการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in category.items %}
+        <tr>
+          <td>
+            {% if item.image_path %}
+            <img src="{{ url_for('static', filename=item.image_path) }}" alt="{{ item.name }}" class="menu-thumb" />
+            {% else %}
+            <span class="muted">-</span>
+            {% endif %}
+          </td>
+          <td>{{ item.name }}</td>
+          <td>{{ "%.2f"|format(item.price) }}</td>
+          <td>
+            {% if item.allow_special %}
+            <span class="badge badge-info">+{{ "%.2f"|format(item.special_price_delta) }} ฿</span>
+            {% else %}
+            <span class="muted">-</span>
+            {% endif %}
+          </td>
+          <td>{{ item.position }}</td>
+          <td>
+            <span class="badge {{ 'badge-success' if item.is_available else 'badge-warning' }}">
+              {{ "พร้อมขาย" if item.is_available else "ปิดชั่วคราว" }}
+            </span>
+          </td>
+          <td>{{ item.description or "-" }}</td>
+          <td>
+            <button class="button button-small button-outline" type="button" data-toggle="menu-form-{{ item.id }}">
+              แก้ไข
+            </button>
+          </td>
+        </tr>
+        <tr id="menu-form-{{ item.id }}" class="menu-edit-row" hidden>
+          <td colspan="8">
+            <form class="inline-form" method="post" action="{{ url_for('main.admin_update_menu_item', item_id=item.id) }}" enctype="multipart/form-data">
+              <label>
+                ชื่อเมนู
+                <input type="text" name="name" value="{{ item.name }}" required />
+              </label>
+              <label>
+                ราคา
+                <input type="number" step="0.01" min="0" name="price" value="{{ "%.2f"|format(item.price) }}" required />
+              </label>
+              <label>
+                ราคาเพิ่มสำหรับ "พิเศษ" (บาท)
+                <input type="number" step="0.01" min="0" name="special_price_delta" value="{{ "%.2f"|format(item.special_price_delta) }}" />
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="allow_special" {% if item.allow_special %}checked{% endif %} />
+                เปิดให้ลูกค้าเลือก “พิเศษ” สำหรับเมนูนี้
+              </label>
+              <label>
+                หมวดหมู่
+                <select name="category_id">
+                  {% for cat in categories %}
+                  <option value="{{ cat.id }}" {% if cat.id == item.category_id %}selected{% endif %}>{{ cat.name }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                ลำดับ
+                <input type="number" name="position" min="0" value="{{ item.position }}" />
+              </label>
+              <label class="checkbox">
+                <input type="checkbox" name="is_available" {% if item.is_available %}checked{% endif %} />
+                พร้อมขาย
+              </label>
+              <label class="full">
+                คำอธิบาย
+                <textarea name="description" rows="2">{{ item.description or "" }}</textarea>
+              </label>
+              <div class="form-grid full image-upload-row">
+                <label>
+                  อัปโหลดรูปใหม่
+                  <input type="file" name="image" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" />
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="remove_image" />
+                  ลบรูปปัจจุบัน
+                </label>
+                {% if item.image_path %}
+                <div class="current-image">
+                  <span class="muted">รูปปัจจุบัน:</span>
+                  <img src="{{ url_for('static', filename=item.image_path) }}" alt="{{ item.name }}" class="menu-thumb" />
+                </div>
+                {% endif %}
+              </div>
+              <div class="form-actions full">
+                <button type="submit" class="button button-primary button-small">บันทึก</button>
+              </div>
+            </form>
+            <div class="ingredient-management">
+              <h5>วัตถุดิบที่ใช้</h5>
+              {% if item.ingredients %}
+              <ul class="ingredient-list">
+                {% for link in item.ingredients %}
+                <li>
+                  <span>{{ link.ingredient.name }} • {{ link.quantity }} {{ link.ingredient.unit }}</span>
+                  <form method="post" action="{{ url_for('main.admin_remove_menu_item_ingredient', item_id=item.id, link_id=link.id) }}">
+                    <button type="submit" class="button button-small button-outline">ลบ</button>
+                  </form>
+                </li>
+                {% endfor %}
+              </ul>
+              {% else %}
+              <p class="muted">ยังไม่ได้กำหนดวัตถุดิบ</p>
+              {% endif %}
+              <form class="inline-form" method="post" action="{{ url_for('main.admin_add_menu_item_ingredient', item_id=item.id) }}">
+                <label>
+                  เลือกวัตถุดิบ
+                  <select name="ingredient_id" required>
+                    <option value="">เลือกวัตถุดิบ</option>
+                    {% for ingredient in ingredients %}
+                    <option value="{{ ingredient.id }}">{{ ingredient.name }} (คงเหลือ {{ "%.2f"|format(ingredient.quantity_on_hand) }} {{ ingredient.unit }})</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>
+                  ปริมาณต่อหนึ่งที่
+                  <input type="number" step="0.01" min="0" name="quantity" required />
+                </label>
+                <div class="form-actions">
+                  <button type="submit" class="button button-small button-primary">บันทึกวัตถุดิบ</button>
+                </div>
+              </form>
+            </div>
+            <div class="option-group-management">
+              <h5>ตัวเลือกเพิ่มเติม</h5>
+              {% if item.option_groups %}
+              {% for group in item.option_groups %}
+              <div class="option-group-card">
+                <form class="form-grid option-group-form" method="post" action="{{ url_for('main.admin_update_option_group', item_id=item.id, group_id=group.id) }}">
+                  <label>
+                    ชื่อกลุ่ม
+                    <input type="text" name="name" value="{{ group.name }}" required />
+                  </label>
+                  <label>
+                    ประเภทการเลือก
+                    <select name="selection_type">
+                      <option value="single" {% if group.selection_type == 'single' %}selected{% endif %}>เลือกได้ 1 รายการ</option>
+                      <option value="multiple" {% if group.selection_type == 'multiple' %}selected{% endif %}>เลือกได้หลายรายการ</option>
+                    </select>
+                  </label>
+                  <label class="checkbox">
+                    <input type="checkbox" name="is_required" {% if group.is_required %}checked{% endif %} />
+                    ต้องเลือกอย่างน้อย 1 รายการ
+                  </label>
+                  <label>
+                    ลำดับ
+                    <input type="number" name="position" value="{{ group.position }}" />
+                  </label>
+                  <div class="form-actions">
+                    <button type="submit" class="button button-small button-primary">บันทึกกลุ่ม</button>
+                  </div>
+                </form>
+                <form method="post" action="{{ url_for('main.admin_delete_option_group', item_id=item.id, group_id=group.id) }}" class="option-group-delete">
+                  <button type="submit" class="button button-small button-outline">ลบกลุ่มนี้</button>
+                </form>
+                <div class="option-list">
+                  {% if group.options %}
+                  {% for option in group.options %}
+                  <div class="option-item-row">
+                    <form class="option-item-form" method="post" action="{{ url_for('main.admin_update_menu_option', item_id=item.id, group_id=group.id, option_id=option.id) }}">
+                      <label>
+                        ชื่อตัวเลือก
+                        <input type="text" name="name" value="{{ option.name }}" required />
+                      </label>
+                      <label>
+                        ราคาที่เพิ่ม (บาท)
+                        <input type="number" name="price" step="0.01" value="{{ "%.2f"|format(option.price_delta) }}" />
+                      </label>
+                      <label>
+                        ลำดับ
+                        <input type="number" name="position" value="{{ option.position }}" />
+                      </label>
+                      <div class="form-actions">
+                        <button type="submit" class="button button-small button-primary">บันทึกตัวเลือก</button>
+                      </div>
+                    </form>
+                    <form method="post" action="{{ url_for('main.admin_delete_menu_option', item_id=item.id, group_id=group.id, option_id=option.id) }}" class="option-item-delete">
+                      <button type="submit" class="button button-small button-outline">ลบ</button>
+                    </form>
+                  </div>
+                  {% endfor %}
+                  {% else %}
+                  <p class="muted small">ยังไม่มีตัวเลือกในกลุ่มนี้</p>
+                  {% endif %}
+                </div>
+                <form class="option-item-form" method="post" action="{{ url_for('main.admin_add_menu_option', item_id=item.id, group_id=group.id) }}">
+                  <label>
+                    ชื่อตัวเลือกใหม่
+                    <input type="text" name="name" required />
+                  </label>
+                  <label>
+                    ราคาที่เพิ่ม (บาท)
+                    <input type="number" name="price" step="0.01" value="0" />
+                  </label>
+                  <label>
+                    ลำดับ
+                    <input type="number" name="position" value="0" />
+                  </label>
+                  <div class="form-actions">
+                    <button type="submit" class="button button-small button-primary">เพิ่มตัวเลือก</button>
+                  </div>
+                </form>
+              </div>
+              {% endfor %}
+              {% else %}
+              <p class="muted">ยังไม่มีตัวเลือกเพิ่มเติมสำหรับเมนูนี้</p>
+              {% endif %}
+              <form class="form-grid option-group-create" method="post" action="{{ url_for('main.admin_create_option_group', item_id=item.id) }}">
+                <h6 class="full">เพิ่มกลุ่มตัวเลือกใหม่</h6>
+                <label>
+                  ชื่อกลุ่ม
+                  <input type="text" name="name" required />
+                </label>
+                <label>
+                  ประเภทการเลือก
+                  <select name="selection_type">
+                    <option value="single">เลือกได้ 1 รายการ</option>
+                    <option value="multiple">เลือกได้หลายรายการ</option>
+                  </select>
+                </label>
+                <label class="checkbox">
+                  <input type="checkbox" name="is_required" />
+                  ต้องเลือกอย่างน้อย 1 รายการ
+                </label>
+                <label>
+                  ลำดับ
+                  <input type="number" name="position" value="0" />
+                </label>
+                <div class="form-actions">
+                  <button type="submit" class="button button-small button-primary">เพิ่มกลุ่มตัวเลือก</button>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">ยังไม่มีเมนูในหมวดนี้</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p>ยังไม่มีหมวดหมู่เมนู กรุณาเพิ่มหมวดหมู่ก่อน</p>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll("[data-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetId = button.getAttribute("data-toggle");
+      const row = document.getElementById(targetId);
+      if (!row) return;
+      const isHidden = row.hasAttribute("hidden");
+      document.querySelectorAll(".menu-edit-row").forEach((r) => r.setAttribute("hidden", ""));
+      if (isHidden) {
+        row.removeAttribute("hidden");
+      }
+    });
+  });
+</script>
+{% endblock %}

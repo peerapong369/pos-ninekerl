@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}จัดการโต๊ะ - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <div>
+      <h2>จัดการโต๊ะหน้าร้าน</h2>
+      <p>สร้าง แก้ไข หรือลบโต๊ะสำหรับให้ลูกค้าเปิดเมนูผ่าน QR Code รวมถึงรีเซ็ตข้อมูลทั้งระบบเมื่อพร้อมเริ่มใช้งานจริง</p>
+    </div>
+    <form method="post" action="{{ url_for('main.admin_reset_data') }}" onsubmit="return confirm('ยืนยันการล้างข้อมูลทั้งหมดและสร้างข้อมูลใหม่หรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้');">
+      <button type="submit" class="button button-outline">ล้างข้อมูลทั้งหมด</button>
+    </form>
+  </div>
+  <p class="muted">คำสั่ง "ล้างข้อมูลทั้งหมด" จะลบออเดอร์ บิล และสต๊อกที่มีอยู่ก่อน แล้วสร้างข้อมูลเริ่มต้นพร้อมโต๊ะ 6 โต๊ะโดยอัตโนมัติ</p>
+</section>
+
+<section class="panel">
+  <h3>เพิ่มโต๊ะใหม่</h3>
+  <form class="form-grid" method="post" action="{{ url_for('main.admin_create_table_entry') }}">
+    <label>
+      ชื่อโต๊ะ
+      <input type="text" name="name" placeholder="เช่น โต๊ะ 1" required />
+    </label>
+    <label>
+      รหัสโต๊ะ (ใช้สำหรับ QR Code)
+      <input type="text" name="code" placeholder="เช่น T1" maxlength="10" required />
+    </label>
+    <div class="form-actions full">
+      <button type="submit" class="button button-primary">เพิ่มโต๊ะ</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <h3>รายการโต๊ะทั้งหมด ({{ tables|length }})</h3>
+  {% if tables %}
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>ชื่อโต๊ะ</th>
+          <th>รหัส</th>
+          <th>จำนวนออเดอร์รวม</th>
+          <th>ออเดอร์ที่ยังไม่ปิด</th>
+          <th>QR เมนูโต๊ะ</th>
+          <th>ดำเนินการ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for table in tables %}
+        {% set total = total_counts.get(table.id, 0) %}
+        {% set active = active_counts.get(table.id, 0) %}
+        <tr class="table-row{% if highlight_id and highlight_id == table.id %} table-row--highlight{% endif %}">
+          <td>{{ table.name }}</td>
+          <td>{{ table.code }}</td>
+          <td>{{ total }}</td>
+          <td>
+            {% if active %}
+            <span class="badge badge-warning">{{ active }} ออเดอร์</span>
+            {% else %}
+            <span class="badge badge-success">ไม่มี</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="qr-cell">
+              <img src="{{ url_for('main.admin_table_qr_image', table_id=table.id) }}" alt="QR {{ table.code }}" class="qr-thumb" loading="lazy" />
+              <a class="button button-small button-outline" href="{{ url_for('main.admin_table_qr_image', table_id=table.id, download=1) }}">ดาวน์โหลด</a>
+            </div>
+          </td>
+          <td>
+            <div class="table-actions">
+              <button class="button button-small button-outline" type="button" data-table-toggle="table-form-{{ table.id }}">แก้ไข</button>
+              <form method="post" action="{{ url_for('main.admin_delete_table_entry', table_id=table.id) }}" onsubmit="return confirm('ต้องการลบ {{ table.name }} หรือไม่?');">
+                <button type="submit" class="button button-small button-outline" {% if total > 0 %}disabled title="ไม่สามารถลบโต๊ะที่มีประวัติคำสั่งซื้อ"{% endif %}>ลบ</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        <tr id="table-form-{{ table.id }}" class="table-edit-row" hidden>
+          <td colspan="6">
+            <form class="inline-form" method="post" action="{{ url_for('main.admin_update_table_entry', table_id=table.id) }}">
+              <label>
+                ชื่อโต๊ะ
+                <input type="text" name="name" value="{{ table.name }}" required />
+              </label>
+              <label>
+                รหัสโต๊ะ
+                <input type="text" name="code" value="{{ table.code }}" required />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="button button-primary button-small">บันทึก</button>
+                <button type="button" class="button button-outline button-small" data-table-toggle="table-form-{{ table.id }}">ปิด</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">* สามารถลบได้เฉพาะโต๊ะที่ยังไม่เคยมีคำสั่งซื้อ เพื่อป้องกันการสูญเสียประวัติย้อนหลัง</p>
+  {% else %}
+  <p class="muted">ยังไม่มีโต๊ะในระบบ กรุณาเพิ่มโต๊ะใหม่</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('[data-table-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetId = button.getAttribute('data-table-toggle');
+      if (!targetId) {
+        return;
+      }
+      const targetRow = document.getElementById(targetId);
+      if (!targetRow) {
+        return;
+      }
+      const isHidden = targetRow.hasAttribute('hidden');
+      document.querySelectorAll('.table-edit-row').forEach((row) => row.setAttribute('hidden', ''));
+      if (isHidden) {
+        targetRow.removeAttribute('hidden');
+      }
+    });
+  });
+</script>
+{% endblock %}

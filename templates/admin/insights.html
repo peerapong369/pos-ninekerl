@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}สถิติเชิงลึก - POS NineKerl{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>สถิติเชิงลึก 30 วันล่าสุด</h2>
+  <div class="admin-grid">
+    <div class="metric-card">
+      <h4>รายได้ 30 วัน</h4>
+      <strong>{{ "%.2f"|format(summary.revenue_30) }} ฿</strong>
+      <p class="muted">จาก {{ summary.orders_30 }} ออเดอร์</p>
+    </div>
+    <div class="metric-card">
+      <h4>ค่าใช้จ่ายเฉลี่ยต่อบิล</h4>
+      <strong>{{ "%.2f"|format(summary.avg_order_value) }} ฿</strong>
+      <p class="muted">AOV = รายได้/จำนวนบิล</p>
+    </div>
+    <div class="metric-card">
+      <h4>เมนูขายดี</h4>
+      <strong>{{ summary.top_item }}</strong>
+      <p class="muted">{{ summary.top_item_qty }} ที่ใน 30 วัน</p>
+    </div>
+    <div class="metric-card">
+      <h4>ช่วงเวลาคึกคัก</h4>
+      <strong>{{ summary.busy_hour }}</strong>
+      <p class="muted">ออเดอร์จ่ายเงินมากสุดในสัปดาห์</p>
+    </div>
+    {% if summary.top_table %}
+    <div class="metric-card">
+      <h4>โต๊ะสร้างรายได้สูงสุด</h4>
+      <strong>{{ summary.top_table.name }}</strong>
+      <p class="muted">{{ "%.2f"|format(summary.top_table.revenue) }} ฿</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <h3>แนวโน้มรายได้ 7 วันหลัง</h3>
+  <canvas id="dailyChart" height="120"></canvas>
+</section>
+
+<section class="panel dual-grid">
+  <div>
+    <h3>รูปแบบการสั่งต่อชั่วโมง</h3>
+    <canvas id="hourlyChart" height="180"></canvas>
+  </div>
+  <div>
+    <h3>สัดส่วนหมวดหมู่ขายดี</h3>
+    <canvas id="categoryChart" height="180"></canvas>
+  </div>
+</section>
+
+<section class="panel dual-grid">
+  <div>
+    <h3>ช่องทางการชำระเงิน (30 วัน)</h3>
+    {% if payment_share %}
+    <ul class="table-list">
+      {% for row in payment_share %}
+      <li>
+        <span class="table-name">{{ row.label }}</span>
+        <span>{{ row.orders }} ออเดอร์ / {{ "%.2f"|format(row.total) }} ฿</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">ยังไม่มีข้อมูลการชำระ</p>
+    {% endif %}
+  </div>
+  <div>
+    <h3>โต๊ะที่ทำรายได้สูงสุด</h3>
+    {% if top_tables %}
+    <ul class="table-list">
+      {% for row in top_tables %}
+      <li>
+        <span class="table-name">{{ row.name }} ({{ row.code }})</span>
+        <span>{{ row.orders }} บิล / {{ "%.2f"|format(row.revenue) }} ฿</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">ยังไม่มีข้อมูล</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <h3>เมนูยอดนิยม</h3>
+  {% if top_items %}
+  <div class="table-wrapper">
+    <table class="recent-orders-table">
+      <thead>
+        <tr>
+          <th>เมนู</th>
+          <th>จำนวนที่ขาย</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in top_items %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.qty }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">ยังไม่มีข้อมูล</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+<script>
+  const dailyData = {{ daily_chart|tojson }};
+  const hourlyData = {{ hourly_chart|tojson }};
+  const categoryData = {{ category_chart|tojson }};
+
+  new Chart(document.getElementById("dailyChart"), {
+    type: "bar",
+    data: {
+      labels: dailyData.labels,
+      datasets: [
+        {
+          label: "รายได้ (บาท)",
+          data: dailyData.revenue,
+          backgroundColor: "rgba(211, 116, 51, 0.6)",
+          borderRadius: 8,
+        },
+        {
+          label: "จำนวนออเดอร์",
+          data: dailyData.orders,
+          type: "line",
+          borderColor: "#3e7466",
+          backgroundColor: "rgba(62, 116, 102, 0.2)",
+          tension: 0.3,
+          yAxisID: "orders",
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        orders: {
+          position: "right",
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+
+  new Chart(document.getElementById("hourlyChart"), {
+    type: "line",
+    data: {
+      labels: hourlyData.labels,
+      datasets: [
+        {
+          label: "จำนวนออเดอร์ที่ชำระ",
+          data: hourlyData.data,
+          borderColor: "#d38234",
+          backgroundColor: "rgba(211, 116, 51, 0.2)",
+          fill: true,
+          tension: 0.35,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+
+  new Chart(document.getElementById("categoryChart"), {
+    type: "doughnut",
+    data: {
+      labels: categoryData.labels,
+      datasets: [
+        {
+          label: "ที่ขาย",
+          data: categoryData.data,
+          backgroundColor: [
+            "#d38234",
+            "#f2c061",
+            "#3e7466",
+            "#c96b1b",
+            "#f59e0b",
+          ],
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "bottom",
+        },
+      },
+    },
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}จัดการสต๊อก - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>คลังวัตถุดิบ</h2>
+  <p>ติดตามปริมาณวัตถุดิบ สำรองสต๊อก และอัปเดตยอดคงเหลือเพื่อให้ระบบเมนูปิดรายการที่วัตถุดิบหมดโดยอัตโนมัติ</p>
+</section>
+
+<section class="panel">
+  <div class="panel-grid">
+    <div>
+      <h3>เพิ่มวัตถุดิบ</h3>
+      <form class="form-grid" method="post" action="{{ url_for('main.admin_create_ingredient') }}">
+        <label>
+          ชื่อวัตถุดิบ
+          <input type="text" name="name" required />
+        </label>
+        <label>
+          หน่วย
+          <input type="text" name="unit" value="หน่วย" />
+        </label>
+        <label>
+          ปริมาณเริ่มต้น
+          <input type="number" step="0.01" min="0" name="quantity_on_hand" value="0" />
+        </label>
+        <label>
+          จุดสั่งซื้อซ้ำ
+          <input type="number" step="0.01" min="0" name="reorder_level" value="0" />
+        </label>
+        <div class="form-actions full">
+          <button type="submit" class="button button-primary">เพิ่มวัตถุดิบ</button>
+        </div>
+      </form>
+    </div>
+
+    <div>
+      <h3>เตือนสต๊อกใกล้หมด</h3>
+      {% if low_stock %}
+      <ul class="ingredient-alerts">
+        {% for ingredient in low_stock %}
+        <li>
+          <strong>{{ ingredient.name }}</strong>
+          <span class="badge badge-warning">
+            เหลือ {{ "%.2f"|format(ingredient.quantity_on_hand) }} {{ ingredient.unit }}
+          </span>
+          <small>จุดเตือน: {{ "%.2f"|format(ingredient.reorder_level) }} {{ ingredient.unit }}</small>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">ยังไม่มีวัตถุดิบใกล้หมด</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h3>วัตถุดิบทั้งหมด</h3>
+  {% if ingredients %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>วัตถุดิบ</th>
+        <th>คงเหลือ</th>
+        <th>จุดเตือน</th>
+        <th>การใช้งาน</th>
+        <th>ดำเนินการ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ingredient in ingredients %}
+      <tr>
+        <td>{{ ingredient.name }}</td>
+        <td>{{ "%.2f"|format(ingredient.quantity_on_hand) }} {{ ingredient.unit }}</td>
+        <td>{{ "%.2f"|format(ingredient.reorder_level) }} {{ ingredient.unit }}</td>
+        <td>
+          {% if ingredient.menu_links %}
+          <ul class="muted-list">
+            {% for link in ingredient.menu_links %}
+            <li>{{ link.menu_item.name }} • {{ link.quantity }} {{ ingredient.unit }}/ที่</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <span class="muted">ยังไม่มีเมนูผูกกับวัตถุดิบนี้</span>
+          {% endif %}
+        </td>
+        <td>
+          <details>
+            <summary>จัดการ</summary>
+            <form class="inline-form" method="post" action="{{ url_for('main.admin_restock_ingredient', ingredient_id=ingredient.id) }}">
+              <label>
+                เติม ({{ ingredient.unit }})
+                <input type="number" step="0.01" min="0.01" name="amount" required />
+              </label>
+              <input type="hidden" name="note" value="เติมสต๊อก" />
+              <button type="submit" class="button button-small button-primary">เติมสต๊อก</button>
+            </form>
+            <form class="inline-form" method="post" action="{{ url_for('main.admin_adjust_ingredient', ingredient_id=ingredient.id) }}">
+              <label>
+                ปรับเป็น ({{ ingredient.unit }})
+                <input type="number" step="0.01" min="0" name="new_quantity" value="{{ "%.2f"|format(ingredient.quantity_on_hand) }}" required />
+              </label>
+              <input type="hidden" name="note" value="ปรับยอดคงเหลือ" />
+              <button type="submit" class="button button-small button-outline">ปรับยอด</button>
+            </form>
+          </details>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>ยังไม่มีรายการวัตถุดิบ</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h3>ความเคลื่อนไหวล่าสุด</h3>
+  {% if recent_movements %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>เวลา</th>
+        <th>วัตถุดิบ</th>
+        <th>ประเภท</th>
+        <th>จำนวน</th>
+        <th>หมายเหตุ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for movement in recent_movements %}
+      <tr>
+        <td>{{ movement.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+        <td>{{ movement.ingredient.name }}</td>
+        <td>
+          <span class="badge {% if movement.movement_type == 'usage' %}badge-warning{% elif movement.movement_type == 'restock' %}badge-success{% else %}badge-info{% endif %}">
+            {{ movement.movement_type }}
+          </span>
+        </td>
+        <td>{{ "%.2f"|format(movement.change) }} {{ movement.ingredient.unit }}</td>
+        <td>{{ movement.note or "-" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="form-actions">
+    <a class="button button-outline" href="{{ url_for('main.admin_stock_movements') }}">ดูประวัติทั้งหมด</a>
+  </div>
+  {% else %}
+  <p class="muted">ยังไม่มีความเคลื่อนไหว</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}รายงานยอดขาย - ผู้ดูแล{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>รายงานยอดขาย</h2>
+  <div class="admin-grid">
+    <div class="metric-card">
+      <h4>ยอดขายรวม</h4>
+      <strong>{{ "%.2f"|format(total_revenue) }} ฿</strong>
+    </div>
+    <div class="metric-card">
+      <h4>จำนวนออเดอร์ที่ปิดบิล</h4>
+      <strong>{{ total_orders }}</strong>
+    </div>
+    <div class="metric-card">
+      <h4>จำนวนเมนูที่ขาย</h4>
+      <strong>{{ total_items }}</strong>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-grid">
+    <div>
+      <h3>ยอดขายรายวัน (ล่าสุด 30 วัน)</h3>
+      {% if daily_rows %}
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th>วันที่</th>
+            <th>จำนวนออเดอร์</th>
+            <th>จำนวนเมนู</th>
+            <th>ยอดขาย (บาท)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in daily_rows %}
+          <tr>
+            <td>{{ row.day }}</td>
+            <td>{{ row.order_count }}</td>
+            <td>{{ row.item_count }}</td>
+            <td>{{ "%.2f"|format(row.total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">ยังไม่มีข้อมูลยอดขายรายวัน</p>
+      {% endif %}
+    </div>
+    <div>
+      <h3>ยอดขายรายเดือน</h3>
+      {% if monthly_rows %}
+      <table class="data-table compact">
+        <thead>
+          <tr>
+            <th>เดือน</th>
+            <th>จำนวนออเดอร์</th>
+            <th>จำนวนเมนู</th>
+            <th>ยอดขาย (บาท)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in monthly_rows %}
+          <tr>
+            <td>{{ row.month }}</td>
+            <td>{{ row.order_count }}</td>
+            <td>{{ row.item_count }}</td>
+            <td>{{ "%.2f"|format(row.total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">ยังไม่มีข้อมูลยอดขายรายเดือน</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-grid">
+    <div>
+      <h3>ช่องทางการจ่ายเงิน</h3>
+      {% if payment_rows %}
+      <ul class="table-list">
+        {% for row in payment_rows %}
+        <li>
+          <span class="table-name">{{ row.label }}</span>
+          <span>{{ "%.2f"|format(row.total) }} ฿</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">ยังไม่มีข้อมูลการรับชำระ</p>
+      {% endif %}
+    </div>
+    <div>
+      <h3>เมนูขายดี (30 วัน)</h3>
+      {% if top_items %}
+      <ul class="table-list">
+        {% for name, qty, value in top_items %}
+        <li>
+          <span class="table-name">{{ name }}</span>
+          <span>{{ qty }} ที่ ({{ "%.2f"|format(value) }} ฿)</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">ยังไม่มีข้อมูลการขาย</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}
