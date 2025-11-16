@@ -13,6 +13,10 @@ const qrImage = document.getElementById("qrImage");
 const qrAmount = document.getElementById("qrAmount");
 const downloadBtn = document.getElementById("downloadQrBtn");
 const settleForm = document.getElementById("settleForm");
+const discountInput = document.getElementById("discountInput");
+const netTotalLabel = document.getElementById("netTotalLabel");
+const qrDiscountRow = document.getElementById("qrDiscountRow");
+const discountPercentLabel = document.getElementById("discountPercentLabel");
 
 function getSelection() {
   const selections = [];
@@ -40,13 +44,26 @@ function getSelection() {
 
 function updateSummary() {
   const selection = getSelection();
+  const percent = getDiscountPercent();
+  const discount = calculateDiscountAmount(selection.total, percent);
+  const net = Math.max(selection.total - discount, 0);
   if (summaryBox) {
     if (!selection.count) {
       summaryBox.innerHTML = "<p>ยังไม่ได้เลือกรายการ</p>";
     } else {
-      summaryBox.innerHTML = `<p>เลือกรวม ${selection.count} รายการ • ยอดรวมค้างชำระ <strong>${selection.total.toFixed(
-        2
-      )} ฿</strong></p>`;
+      const discountText = discount > 0 ? ` • ส่วนลด ${percent}% (${discount.toFixed(2)} ฿)` : "";
+      summaryBox.innerHTML = `<p>เลือกรวม ${selection.count} รายการ • ยอดรวมค้างชำระ <strong>${selection.total.toFixed(2)} ฿</strong>${discountText}</p>`;
+    }
+  }
+
+  if (netTotalLabel) {
+    netTotalLabel.textContent = `${net.toFixed(2)} ฿`;
+  }
+  if (discountPercentLabel) {
+    if (percent > 0) {
+      discountPercentLabel.textContent = `(ส่วนลด ${percent}% = ${discount.toFixed(2)} ฿)`;
+    } else {
+      discountPercentLabel.textContent = "";
     }
   }
 
@@ -65,6 +82,10 @@ function updateSummary() {
     if (qrImage) {
       qrImage.removeAttribute("src");
     }
+    if (qrDiscountRow) {
+      qrDiscountRow.hidden = true;
+      qrDiscountRow.textContent = "";
+    }
   }
 }
 
@@ -78,6 +99,9 @@ async function generateQr() {
     alert("รายการที่เลือกไม่มียอดค้างชำระ");
     return;
   }
+
+  const percent = getDiscountPercent();
+  const discount = calculateDiscountAmount(selection.total, percent);
 
   try {
     if (generateBtn) {
@@ -93,6 +117,7 @@ async function generateQr() {
       body: JSON.stringify({
         table_code: tableCode,
         order_ids: selection.ids,
+        discount_amount: discount,
       }),
     });
 
@@ -123,6 +148,20 @@ async function generateQr() {
     if (qrAmount) {
       const formatted = data.formatted_amount || (data.amount ? Number(data.amount).toFixed(2) : "");
       qrAmount.textContent = formatted;
+    }
+    if (qrDiscountRow) {
+      if (data.discount_applied && Number(data.discount_applied) > 0) {
+        const grossValue = data.gross_amount ? Number(data.gross_amount) : Number(data.amount) + Number(data.discount_applied);
+        const gross = grossValue ? grossValue.toFixed(2) : formatted;
+        const inferredPercent = grossValue ? Math.min(Math.round((Number(data.discount_applied) / grossValue) * 100), 100) : percent;
+        const line = inferredPercent
+          ? `รวมก่อนส่วนลด ${gross} ฿ • ส่วนลด ${inferredPercent}% (${Number(data.discount_applied).toFixed(2)} ฿)`
+          : `รวมก่อนส่วนลด ${gross} ฿ • ส่วนลด ${Number(data.discount_applied).toFixed(2)} ฿`;
+        qrDiscountRow.textContent = line;
+        qrDiscountRow.hidden = false;
+      } else {
+        qrDiscountRow.hidden = true;
+      }
     }
     if (qrPreview) {
       qrPreview.hidden = false;
@@ -157,6 +196,9 @@ function clearSelection() {
       checkbox.checked = false;
     }
   });
+  if (discountInput) {
+    discountInput.value = "0";
+  }
   updateSummary();
 }
 
@@ -183,6 +225,34 @@ if (clearBtn) {
 }
 if (settleForm) {
   settleForm.addEventListener("submit", handleSubmit);
+}
+
+function getDiscountPercent() {
+  if (!discountInput) {
+    return 0;
+  }
+  let value = parseInt(discountInput.value, 10);
+  if (Number.isNaN(value) || value < 0) {
+    value = 0;
+  }
+  value = Math.min(value, 100);
+  if (discountInput.value !== value.toString()) {
+    discountInput.value = String(value);
+  }
+  return value;
+}
+
+function calculateDiscountAmount(total, percent) {
+  if (!total || percent <= 0) {
+    return 0;
+  }
+  const raw = (total * percent) / 100;
+  const clamped = Math.min(raw, total);
+  return Number(clamped.toFixed(2));
+}
+
+if (discountInput) {
+  discountInput.addEventListener("input", updateSummary);
 }
 
 updateSummary();

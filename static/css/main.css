@@ -1582,6 +1582,18 @@ details[open] summary {
   font-size: 1rem;
 }
 
+.billing-discount {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+.billing-discount input {
+  max-width: 160px;
+}
+
 .billing-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1596,6 +1608,23 @@ details[open] summary {
 
 .billing-reference input {
   width: 100%;
+}
+
+.promptpay-form {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.promptpay-form input {
+  max-width: 320px;
+}
+
+.promptpay-form .form-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .qr-preview {

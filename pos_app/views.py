@@ -18,6 +18,7 @@ from flask import (
     request,
     send_file,
     send_from_directory,
+    session,
     url_for,
 )
 import csv
@@ -46,6 +47,7 @@ from .models import (
     OrderStatusEnum,
     Payment,
     PaymentMethodEnum,
+    Setting,
     StockMovement,
     StockMovementTypeEnum,
     seed_sample_data,
@@ -105,7 +107,10 @@ SPECIAL_MENU_CONFIG = {
 
 def _promptpay_config() -> Tuple[str | None, str | None]:
     """Return configured PromptPay target and normalized value (if valid)."""
-    raw_target = current_app.config.get("PROMPTPAY_TARGET")
+    stored = db_session.scalar(
+        select(Setting.value).where(Setting.key == "promptpay_target")
+    )
+    raw_target = stored or current_app.config.get("PROMPTPAY_TARGET")
     if not raw_target:
         return None, None
     try:
@@ -792,6 +797,41 @@ def admin_order_receipt(order_id: int):
     )
 
 
+@main_blueprint.route("/admin/billing/promptpay", methods=["POST"])
+@login_required("adminpp")
+def admin_update_promptpay():
+    target = request.form.get("promptpay_target", "").strip()
+    next_url = request.form.get("next") or url_for("main.admin_billing_overview")
+
+    if target:
+        try:
+            normalize_target(target)
+        except ValueError:
+            flash("หมายเลข PromptPay ไม่ถูกต้อง", "error")
+            return redirect(next_url)
+
+    setting = (
+        db_session.query(Setting)
+        .filter(Setting.key == "promptpay_target")
+        .one_or_none()
+    )
+
+    if target:
+        if setting:
+            setting.value = target
+        else:
+            db_session.add(Setting(key="promptpay_target", value=target))
+        message = "บันทึกหมายเลข PromptPay เรียบร้อย"
+    else:
+        if setting:
+            db_session.delete(setting)
+        message = "ล้างการตั้งค่า PromptPay เรียบร้อย"
+
+    db_session.commit()
+    flash(message, "success")
+    return redirect(next_url)
+
+
 @main_blueprint.route("/admin/billing")
 @login_required("admin")
 def admin_billing_overview():
@@ -829,11 +869,14 @@ def admin_billing_overview():
         )
 
     raw_target, normalized_target = _promptpay_config()
+    user = session.get("user") or {}
+    can_manage_promptpay = "adminpp" in user.get("roles", [])
     return render_template(
         "admin/billing.html",
         tables=summaries,
         promptpay_target=raw_target,
         promptpay_ready=bool(normalized_target),
+        can_manage_promptpay=can_manage_promptpay,
     )
 
 
@@ -910,16 +953,30 @@ def admin_generate_billing_qr():
         unpaid_orders.append(order)
         total_due += due
 
-    amount = round(total_due, 2)
-    if amount <= 0:
+    gross_amount = round(total_due, 2)
+    if gross_amount <= 0:
         return jsonify({"message": "รายการที่เลือกไม่มีค้างชำระ"}), 400
+
+    discount_raw = payload.get("discount_amount", 0)
+    try:
+        discount_amount = round(float(discount_raw), 2)
+    except (TypeError, ValueError):
+        return jsonify({"message": "รูปแบบส่วนลดไม่ถูกต้อง"}), 400
+    if discount_amount < 0:
+        discount_amount = 0.0
+    if discount_amount > gross_amount:
+        discount_amount = gross_amount
+
+    net_amount = round(gross_amount - discount_amount, 2)
+    if net_amount <= 0:
+        return jsonify({"message": "ยอดสุทธิหลังหักส่วนลดต้องมากกว่า 0"}), 400
 
     raw_target, normalized_target = _promptpay_config()
     if not normalized_target:
         return jsonify({"message": "ยังไม่ได้ตั้งค่า PromptPay สำหรับร้าน"}), 400
 
     try:
-        payload_value = build_promptpay_payload(normalized_target, amount)
+        payload_value = build_promptpay_payload(normalized_target, net_amount)
         qr_image = generate_qr_base64(payload_value)
     except Exception:
         current_app.logger.exception("Failed to generate PromptPay QR for table %s", table.code)
@@ -927,8 +984,10 @@ def admin_generate_billing_qr():
 
     return jsonify(
         {
-            "amount": amount,
-            "formatted_amount": f"{amount:.2f}",
+            "amount": net_amount,
+            "gross_amount": gross_amount,
+            "discount_applied": discount_amount,
+            "formatted_amount": f"{net_amount:.2f}",
             "orders": [order.id for order in unpaid_orders],
             "payload": payload_value,
             "qr_image": qr_image,

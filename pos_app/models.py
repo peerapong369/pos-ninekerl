@@ -21,6 +21,17 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base, db_session
 
 
+class Setting(Base):
+    __tablename__ = "settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<Setting {self.key}>"
+
+
 class DiningTable(Base):
     __tablename__ = "dining_tables"
 

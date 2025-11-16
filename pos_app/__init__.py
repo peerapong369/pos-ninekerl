@@ -50,6 +50,11 @@ def create_app():
             "password": os.getenv("ADMIN_PASSWORD", "admin123"),
             "roles": ["admin", "kitchen"],
         },
+        "adminpp": {
+            "username": os.getenv("ADMIN_PLUS_USERNAME", "adminpp"),
+            "password": os.getenv("ADMIN_PLUS_PASSWORD", "adminpp123"),
+            "roles": ["admin", "kitchen", "adminpp"],
+        },
     }
 
     init_db(app.config["SQLALCHEMY_DATABASE_URI"])

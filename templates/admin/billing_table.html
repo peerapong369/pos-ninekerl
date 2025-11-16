@@ -104,6 +104,16 @@
     <div class="billing-summary" id="billingSummary">
       <p>ยังไม่ได้เลือกรายการ</p>
     </div>
+    <div class="billing-discount">
+      <label>
+        ส่วนลดก่อนสร้าง QR (% ต่อจากยอดที่เลือก)
+        <input type="number" min="0" max="100" step="1" id="discountInput" value="0" inputmode="numeric" />
+      </label>
+      <p class="muted">
+        ยอดสุทธิหลังส่วนลด: <strong id="netTotalLabel">0.00 ฿</strong>
+        <span id="discountPercentLabel" class="muted"></span>
+      </p>
+    </div>
     <div class="billing-actions">
       <button type="button" class="button button-outline" id="clearSelectionBtn">ล้างรายการ</button>
       <button type="button" class="button button-primary" id="generateQrBtn" {% if not promptpay_ready %}disabled{% endif %}>
@@ -125,6 +135,7 @@
       </div>
       <div class="qr-preview__meta">
         <p><strong>ยอดรวม:</strong> <span id="qrAmount"></span> บาท</p>
+        <p class="muted" id="qrDiscountRow" hidden></p>
         <p class="muted">ลูกค้าสแกนและชำระตามยอดนี้ จากนั้นกดยืนยันปิดบิล</p>
         <button type="button" class="button button-small" id="downloadQrBtn">ดาวน์โหลด QR</button>
       </div>

@@ -21,6 +21,21 @@
   {% elif promptpay_target %}
   <p class="muted">PromptPay ปัจจุบัน: <strong>{{ promptpay_target }}</strong></p>
   {% endif %}
+
+  {% if can_manage_promptpay %}
+  <form class="promptpay-form" method="post" action="{{ url_for('main.admin_update_promptpay') }}">
+    <input type="hidden" name="next" value="{{ request.path }}" />
+    <label>
+      ปรับหมายเลข PromptPay สำหรับรับชำระเงิน
+      <input type="text" name="promptpay_target" value="{{ promptpay_target or '' }}" placeholder="เช่น 0823293693" />
+    </label>
+    <div class="form-actions">
+      <button type="submit" class="button button-primary button-small">บันทึกหมายเลข PromptPay</button>
+      <button type="submit" name="promptpay_target" value="" class="button button-outline button-small">ล้างค่า</button>
+    </div>
+    <small class="muted">รองรับเบอร์โทรศัพท์ บัตรประชาชน หรือ PromptPay ID อื่น ๆ</small>
+  </form>
+  {% endif %}
 </section>
 
 <section class="panel">

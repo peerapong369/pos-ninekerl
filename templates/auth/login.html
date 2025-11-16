@@ -4,7 +4,10 @@
 
 {% block content %}
 <section class="panel panel-narrow">
-  <h2>เข้าสู่ระบบ{% if role == "kitchen" %}สำหรับครัว{% elif role == "admin" %}สำหรับผู้ดูแล{% endif %}</h2>
+  <h2>
+    เข้าสู่ระบบ
+    {% if role == "kitchen" %}สำหรับครัว{% elif role == "admin" %}สำหรับผู้ดูแล{% elif role == "adminpp" %}สำหรับ Admin++{% endif %}
+  </h2>
   <form method="post" class="auth-form">
     <input type="hidden" name="role" value="{{ role }}" />
     <input type="hidden" name="next" value="{{ next_url }}" />
@@ -24,8 +27,14 @@
   <p class="auth-hint">
     {% if role == "kitchen" %}
     ต้องการเข้าฝ่ายจัดการร้าน? <a href="{{ url_for('auth.login', role='admin', next=next_url) }}">เข้าสู่ระบบผู้ดูแล</a>
+    {% elif role == "admin" %}
+    ต้องการเข้าหน้าครัว? <a href="{{ url_for('auth.login', role='kitchen', next=next_url) }}">เข้าสู่ระบบครัว</a><br />
+    ต้องการสิทธิ์สูงสุด? <a href="{{ url_for('auth.login', role='adminpp', next=next_url) }}">เข้าสู่ระบบ Admin++</a>
+    {% elif role == "adminpp" %}
+    ต้องการเข้าหน้าครัว? <a href="{{ url_for('auth.login', role='kitchen', next=next_url) }}">เข้าสู่ระบบครัว</a><br />
+    ต้องการสิทธิ์ผู้ดูแลทั่วไป? <a href="{{ url_for('auth.login', role='admin', next=next_url) }}">เข้าสู่ระบบผู้ดูแล</a>
     {% else %}
-    ต้องการเข้าหน้าครัว? <a href="{{ url_for('auth.login', role='kitchen', next=next_url) }}">เข้าสู่ระบบครัว</a>
+    ต้องการเข้าฝ่ายจัดการร้าน? <a href="{{ url_for('auth.login', role='admin', next=next_url) }}">เข้าสู่ระบบผู้ดูแล</a>
     {% endif %}
   </p>
 </section>
