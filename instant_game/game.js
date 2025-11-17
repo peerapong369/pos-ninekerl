@@ -1,5 +1,5 @@
 const GAME_DURATION = 30;
-const TARGET_JUICE = 100;
+let TARGET_JUICE = 100;
 const THEME_PRIMARY = 0x2f7d32;
 const THEME_ACCENT = 0x8cd867;
 const LEMON_TEXTURE = "lime_1";
@@ -60,7 +60,7 @@ class LemonScene extends Phaser.Scene {
 
     this.progressBg = this.add.rectangle(centerX, 560, 320, 22, 0xffffff, 0.25).setStrokeStyle(2, 0x2f3d1e, 0.6);
     this.progressFill = this.add.rectangle(centerX - 160, 560, 0, 18, 0xf2c061, 0.95).setOrigin(0, 0.5);
-    this.promptText = this.add.text(centerX, 520, "แตะมะนาวเพื่อบีบให้ครบ 239 ครั้ง", {
+    this.promptText = this.add.text(centerX, 520, `แตะมะนาวเพื่อบีบให้ครบ ${TARGET_JUICE} ครั้ง`, {
       fontSize: "22px",
       color: "#2f3d1e",
       fontStyle: "italic",
@@ -180,7 +180,8 @@ class LemonScene extends Phaser.Scene {
       this.resultBanner.setText("🎉 สำเร็จ! บีบครบ 100% 🎉");
       this.resultBanner.setColor("#2f7d32");
     } else {
-      this.resultBanner.setText(timeout ? "Game Over! แตะเล่นใหม่ได้เลย" : `Progress: ${this.squeezeCount}%`);
+      const percent = Math.round((this.squeezeCount / TARGET_JUICE) * 100);
+      this.resultBanner.setText(timeout ? "Game Over! แตะเล่นใหม่ได้เลย" : `Progress: ${percent}%`);
       this.resultBanner.setColor("#d84315");
     }
   }
@@ -209,7 +210,7 @@ window.LemonGame = {
     if (!overlay || !title || !description) return;
     if (success) {
       title.textContent = "ภารกิจสำเร็จ! 😀";
-      description.textContent = `คุณบีบครบ 239 ครั้งใน ${30 - timeLeft} วินาที`;
+      description.textContent = `คุณบีบครบ ${TARGET_JUICE} ครั้งใน ${30 - timeLeft} วินาที`;
     } else {
       title.textContent = "Game Over!";
       description.textContent = `บีบได้ ${count} ครั้ง ลองใหม่อีกครั้งนะ`;
@@ -300,6 +301,18 @@ window.addEventListener("load", async () => {
         prompt("คัดลอกลิงก์เกมด้วยตนเอง:", url);
       }
     });
+  }
+
+  try {
+    const configResp = await fetch("/api/game/config");
+    if (configResp.ok) {
+      const data = await configResp.json();
+      if (data && data.target_squeezes) {
+        TARGET_JUICE = parseInt(data.target_squeezes, 10) || TARGET_JUICE;
+      }
+    }
+  } catch (error) {
+    console.warn("ใช้ค่าเริ่มต้น TARGET_JUICE", error);
   }
 
   launchGame();

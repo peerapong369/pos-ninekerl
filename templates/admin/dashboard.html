@@ -43,6 +43,9 @@
     <a class="button button-primary" href="{{ url_for('main.admin_reports') }}">รายงานยอดขาย</a>
     <a class="button button-outline" href="{{ url_for('main.admin_insights') }}">สถิติเชิงลึก</a>
     <a class="button button-outline" href="{{ url_for('main.kitchen_dashboard') }}" target="_blank" rel="noopener">เปิดหน้าครัว</a>
+    {% if current_user and 'adminpp' in current_user.roles %}
+    <a class="button button-outline" href="{{ url_for('main.admin_game_settings') }}">ตั้งค่าเป้าหมายเกม</a>
+    {% endif %}
   </div>
 </section>
 

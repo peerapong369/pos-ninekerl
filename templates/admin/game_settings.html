@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่าเกมบีบมะนาว - Admin++{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ตั้งค่าเป้าหมายเกมบีบมะนาว</h2>
+  <p>กำหนดจำนวนครั้งที่ต้องบีบให้ได้ 100% สำหรับเกมโปรโมชันในหน้าเว็บ</p>
+
+  <form class="form-grid" method="post" action="{{ url_for('main.admin_game_settings') }}">
+    <label>
+      เป้าหมายที่ถือว่า 100% (จำนวนครั้ง)
+      <input type="number" name="target" min="1" step="1" required value="{{ target }}" />
+    </label>
+    <div class="form-actions full">
+      <button type="submit" class="button button-primary">บันทึกเป้าหมาย</button>
+    </div>
+  </form>
+
+  <p class="muted">ค่าปัจจุบัน: {{ target }} ครั้ง</p>
+</section>
+{% endblock %}

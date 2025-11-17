@@ -120,6 +120,15 @@ def _promptpay_config() -> Tuple[str | None, str | None]:
     return raw_target, normalized
 
 
+def _get_game_target(default: int = 239) -> int:
+    value = db_session.scalar(select(Setting.value).where(Setting.key == "game_target"))
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
 def _save_menu_image(file_storage) -> str:
     if not file_storage or not file_storage.filename:
         raise ValueError("กรุณาเลือกรูปภาพที่ต้องการอัปโหลด")
@@ -411,6 +420,12 @@ def api_menu():
             )
 
     return jsonify(result)
+
+
+@main_blueprint.route("/api/game/config")
+def api_game_config():
+    target = _get_game_target()
+    return jsonify({"target_squeezes": target})
 
 
 @main_blueprint.route("/api/orders", methods=["POST"])
@@ -878,6 +893,33 @@ def admin_billing_overview():
         promptpay_ready=bool(normalized_target),
         can_manage_promptpay=can_manage_promptpay,
     )
+
+
+@main_blueprint.route("/admin/game-settings", methods=["GET", "POST"])
+@login_required("adminpp")
+def admin_game_settings():
+    current_target = _get_game_target()
+    if request.method == "POST":
+        raw_target = request.form.get("target", "").strip()
+        try:
+            target = int(raw_target)
+        except (TypeError, ValueError):
+            flash("กรุณาระบุจำนวนครั้งเป็นตัวเลข", "error")
+            return redirect(url_for("main.admin_game_settings"))
+        if target <= 0:
+            flash("จำนวนครั้งต้องมากกว่า 0", "error")
+            return redirect(url_for("main.admin_game_settings"))
+
+        setting = db_session.query(Setting).filter(Setting.key == "game_target").one_or_none()
+        if setting:
+            setting.value = str(target)
+        else:
+            db_session.add(Setting(key="game_target", value=str(target)))
+        db_session.commit()
+        flash("บันทึกเป้าหมายเกมเรียบร้อย", "success")
+        return redirect(url_for("main.admin_game_settings"))
+
+    return render_template("admin/game_settings.html", target=current_target)
 
 
 @main_blueprint.route("/admin/billing/<string:table_code>")
