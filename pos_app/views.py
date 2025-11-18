@@ -23,6 +23,7 @@ from flask import (
 )
 import csv
 import qrcode
+import json
 from PIL import Image, ImageDraw, ImageFont
 from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
@@ -127,6 +128,77 @@ def _get_game_target(default: int = 239) -> int:
     except (TypeError, ValueError):
         return default
     return parsed if parsed > 0 else default
+
+
+def _get_store_hours() -> Dict[str, Dict[str, str | bool]]:
+    raw = db_session.scalar(select(Setting.value).where(Setting.key == "store_hours"))
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _save_store_hours(hours: Dict[str, Dict[str, str | bool]]) -> None:
+    payload = json.dumps(hours, ensure_ascii=False)
+    setting = db_session.query(Setting).filter(Setting.key == "store_hours").one_or_none()
+    if setting:
+        setting.value = payload
+    else:
+        db_session.add(Setting(key="store_hours", value=payload))
+    db_session.commit()
+
+
+def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
+    now = now or datetime.now()
+    hours = _get_store_hours()
+    weekday_keys = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+    ]
+    today_key = weekday_keys[now.weekday()]
+
+    def parse_time(value: str | None):
+        if not value:
+            return None
+        try:
+            return datetime.strptime(value, "%H:%M").time()
+        except ValueError:
+            return None
+
+    info_today = hours.get(today_key, {}) if isinstance(hours, dict) else {}
+    open_now = False
+    next_open_label = None
+
+    if info_today.get("open"):
+        start_t = parse_time(info_today.get("start"))
+        end_t = parse_time(info_today.get("end"))
+        if start_t and end_t:
+            today_start = now.replace(hour=start_t.hour, minute=start_t.minute, second=0, microsecond=0)
+            today_end = now.replace(hour=end_t.hour, minute=end_t.minute, second=0, microsecond=0)
+            if today_start <= now <= today_end:
+                open_now = True
+            elif now < today_start:
+                next_open_label = f"วันนี้ {info_today.get('start')}"
+
+    if not open_now and not next_open_label:
+        for offset in range(1, 8):
+            idx = (now.weekday() + offset) % 7
+            key = weekday_keys[idx]
+            info = hours.get(key, {}) if isinstance(hours, dict) else {}
+            if info.get("open") and info.get("start"):
+                label_day = "พรุ่งนี้" if offset == 1 else f"อีก {offset} วัน"
+                next_open_label = f"{label_day} เวลา {info.get('start')}"
+                break
+
+    return {"open": open_now, "next_open": next_open_label}
 
 
 def _save_menu_image(file_storage) -> str:
@@ -370,11 +442,14 @@ def table_menu(table_code: str):
                 "special": special_payload,
             }
 
+    store_status = _store_status()
+
     return render_template(
         "table_menu.html",
         table=table,
         categories=categories,
         menu_configs=menu_configs,
+        store_status=store_status,
     )
 
 
@@ -443,6 +518,14 @@ def api_create_order():
     )
     if not table:
         abort(404, description="Table not found")
+
+    status = _store_status()
+    if status.get("open") is False:
+        message = "ขณะนี้ร้านปิดอยู่"
+        next_open = status.get("next_open")
+        if next_open:
+            message = f"ขณะนี้ร้านปิดอยู่ จะเปิดอีกครั้ง {next_open}"
+        abort(403, description=message)
 
     order = Order(table=table, status=OrderStatusEnum.PENDING.value, note=note)
     db_session.add(order)
@@ -922,6 +1005,46 @@ def admin_game_settings():
     return render_template("admin/game_settings.html", target=current_target)
 
 
+@main_blueprint.route("/admin/store-hours", methods=["GET", "POST"])
+@login_required("adminpp")
+def admin_store_hours():
+    days = [
+        ("monday", "วันจันทร์"),
+        ("tuesday", "วันอังคาร"),
+        ("wednesday", "วันพุธ"),
+        ("thursday", "วันพฤหัสบดี"),
+        ("friday", "วันศุกร์"),
+        ("saturday", "วันเสาร์"),
+        ("sunday", "วันอาทิตย์"),
+    ]
+    current_hours = _get_store_hours()
+
+    if request.method == "POST":
+        new_hours: Dict[str, Dict[str, str | bool]] = {}
+        for key, _label in days:
+            is_open = request.form.get(f"open_{key}") == "on"
+            open_time = request.form.get(f"start_{key}", "").strip()
+            close_time = request.form.get(f"end_{key}", "").strip()
+
+            if is_open:
+                if not open_time or not close_time:
+                    flash("กรุณาระบุเวลาเปิด-ปิดให้ครบทุกวันที่เปิด", "error")
+                    return redirect(url_for("main.admin_store_hours"))
+                new_hours[key] = {
+                    "open": True,
+                    "start": open_time,
+                    "end": close_time,
+                }
+            else:
+                new_hours[key] = {"open": False, "start": "", "end": ""}
+
+        _save_store_hours(new_hours)
+        flash("บันทึกเวลาเปิด-ปิดร้านเรียบร้อย", "success")
+        return redirect(url_for("main.admin_store_hours"))
+
+    return render_template("admin/store_hours.html", days=days, hours=current_hours)
+
+
 @main_blueprint.route("/admin/billing/<string:table_code>")
 @login_required("admin")
 def admin_billing_table_view(table_code: str):
@@ -948,6 +1071,7 @@ def admin_billing_table_view(table_code: str):
         status_labels=STATUS_LABELS,
         promptpay_target=raw_target,
         promptpay_ready=bool(normalized_target),
+        store_status=_store_status(),
     )
 
 

@@ -5,7 +5,11 @@
 {% block content %}
 <section class="panel">
   <h2>เมนูสำหรับ {{ table.name }} ({{ table.code }})</h2>
+  {% if store_status and store_status.open == false %}
+  <p class="callout warning">ขณะนี้ร้านปิดอยู่ {% if store_status.next_open %}จะเปิดอีกครั้ง {{ store_status.next_open }}{% endif %}</p>
+  {% else %}
   <p>เลือกเมนูที่ต้องการแล้วกดส่งออเดอร์เข้าครัวได้เลย</p>
+  {% endif %}
   <a class="button button-outline" href="{{ url_for('main.instant_game') }}" target="_blank" rel="noopener">เล่นเกมบีบมะนาวรับส่วนลด</a>
 </section>
 

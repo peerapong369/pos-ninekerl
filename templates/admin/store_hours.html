@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งเวลาเปิด-ปิดร้าน - Admin++{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ตั้งเวลาเปิด-ปิดร้าน</h2>
+  <p>Admin++ สามารถกำหนดวันและช่วงเวลาที่ร้านเปิดให้ลูกค้าใช้งานได้</p>
+  <form class="form-grid" method="post" action="{{ url_for('main.admin_store_hours') }}">
+    {% for key, label in days %}
+    {% set day = hours.get(key, {}) %}
+    <div class="day-row">
+      <label class="checkbox">
+        <input type="checkbox" name="open_{{ key }}" {% if day.get('open') %}checked{% endif %} />
+        {{ label }}
+      </label>
+      <label>
+        เปิด
+        <input type="time" name="start_{{ key }}" value="{{ day.get('start','') }}" />
+      </label>
+      <label>
+        ปิด
+        <input type="time" name="end_{{ key }}" value="{{ day.get('end','') }}" />
+      </label>
+    </div>
+    {% endfor %}
+    <div class="form-actions full">
+      <button type="submit" class="button button-primary">บันทึกเวลาเปิด-ปิด</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
