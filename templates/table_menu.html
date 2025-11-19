@@ -144,6 +144,27 @@
     </footer>
   </div>
 </div>
+
+<div class="menu-modal" id="orderConfirmModal" hidden>
+  <div class="menu-modal__backdrop" data-dismiss="confirm"></div>
+  <div class="menu-modal__dialog" role="dialog" aria-modal="true">
+    <button type="button" class="menu-modal__close" id="confirmClose" aria-label="ปิดหน้าต่าง">&times;</button>
+    <header class="menu-modal__header">
+      <h3>ตรวจสอบออเดอร์</h3>
+      <p class="muted">ยืนยันก่อนส่งเข้าครัว</p>
+    </header>
+    <div class="menu-modal__body">
+      <ul class="compact-list" id="confirmItems"></ul>
+      <p class="summary-row"><span>รวม</span> <strong id="confirmTotal">0.00 ฿</strong></p>
+    </div>
+    <footer class="menu-modal__footer">
+      <div class="modal-actions">
+        <button type="button" class="button button-outline" id="confirmContinue">เลือกเพิ่ม</button>
+        <button type="button" class="button button-primary" id="confirmSubmit">ส่งออเดอร์</button>
+      </div>
+    </footer>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

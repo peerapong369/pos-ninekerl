@@ -23,6 +23,13 @@ const addBtn = document.getElementById("customizerAdd");
 const cancelBtn = document.getElementById("customizerCancel");
 const closeBtn = document.getElementById("customizerClose");
 const modalBackdrop = modal ? modal.querySelector(".menu-modal__backdrop") : null;
+const confirmModal = document.getElementById("orderConfirmModal");
+const confirmBackdrop = confirmModal ? confirmModal.querySelector(".menu-modal__backdrop") : null;
+const confirmItemsList = document.getElementById("confirmItems");
+const confirmTotalLabel = document.getElementById("confirmTotal");
+const confirmCloseBtn = document.getElementById("confirmClose");
+const confirmContinueBtn = document.getElementById("confirmContinue");
+const confirmSubmitBtn = document.getElementById("confirmSubmit");
 const noteInput = document.getElementById("customizerNote");
 const specialSection = document.getElementById("specialSection");
 const specialToggle = document.getElementById("specialToggle");
@@ -168,6 +175,7 @@ function addSimpleItem(menuItemId, name, basePrice, note = null) {
     note,
     selections: null,
   });
+  openConfirmModal();
 }
 
 function addCustomizedItem(state) {
@@ -198,6 +206,7 @@ function addCustomizedItem(state) {
     note,
     selections: cloneSelectionState(state.selections),
   });
+  openConfirmModal();
 }
 
 function renderOrder() {
@@ -231,6 +240,9 @@ function renderOrder() {
 
   orderTotalLabel.textContent = `${formatCurrency(total)} ฿`;
   submitBtn.disabled = orderState.size === 0;
+  if (confirmModal && confirmModal.hidden === false) {
+    renderConfirmModal();
+  }
 }
 
 function updateQuantity(itemKey, delta) {
@@ -291,6 +303,7 @@ async function submitOrder() {
     noteField.value = "";
     orderStatusMessage.textContent = "ส่งออเดอร์เรียบร้อยแล้ว ขอบคุณค่ะ!";
     await fetchActiveOrders();
+    closeConfirmModal();
   } catch (error) {
     console.error(error);
     orderStatusMessage.textContent = error.message || "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง";
@@ -617,6 +630,44 @@ function closeCustomization() {
   document.body.classList.remove("modal-open");
 }
 
+function renderConfirmModal() {
+  if (!confirmItemsList || !confirmTotalLabel) {
+    return;
+  }
+  const items = Array.from(orderState.values());
+  confirmItemsList.innerHTML = "";
+  if (!items.length) {
+    confirmItemsList.innerHTML = "<li>ยังไม่มีรายการในออเดอร์</li>";
+    confirmTotalLabel.textContent = "0.00 ฿";
+    return;
+  }
+  let total = 0;
+  items.forEach((item) => {
+    total += item.unitPrice * item.quantity;
+    const li = document.createElement("li");
+    li.textContent = `${item.quantity} x ${item.name}${item.note ? ` (${item.note})` : ""}`;
+    confirmItemsList.appendChild(li);
+  });
+  confirmTotalLabel.textContent = `${formatCurrency(total)} ฿`;
+}
+
+function openConfirmModal() {
+  if (!confirmModal) {
+    return;
+  }
+  renderConfirmModal();
+  confirmModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeConfirmModal() {
+  if (!confirmModal) {
+    return;
+  }
+  confirmModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
 function updateSpecialSection() {
   if (!specialSection || !specialToggle || !specialLabel || !modalState) {
     return;
@@ -758,6 +809,14 @@ if (modalBackdrop) {
   modalBackdrop.addEventListener("click", () => closeCustomization());
 }
 
+if (confirmBackdrop) {
+  confirmBackdrop.addEventListener("click", () => closeConfirmModal());
+}
+
+if (confirmBackdrop) {
+  confirmBackdrop.addEventListener("click", () => closeConfirmModal());
+}
+
 if (addBtn) {
   addBtn.addEventListener("click", () => {
     if (!modalState) {
@@ -810,6 +869,20 @@ orderItemsList.addEventListener("click", (event) => {
 
 submitBtn.addEventListener("click", submitOrder);
 window.addEventListener("load", fetchActiveOrders);
+
+if (confirmCloseBtn) {
+  confirmCloseBtn.addEventListener("click", closeConfirmModal);
+}
+
+if (confirmContinueBtn) {
+  confirmContinueBtn.addEventListener("click", closeConfirmModal);
+}
+
+if (confirmSubmitBtn) {
+  confirmSubmitBtn.addEventListener("click", () => {
+    submitOrder();
+  });
+}
 
 if (specialToggle) {
   specialToggle.addEventListener("change", () => {
