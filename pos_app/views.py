@@ -371,6 +371,10 @@ def _handle_line_text_event(event: MessageEvent) -> str | None:
 
 @main_blueprint.route("/")
 def home():
+    user = session.get("user")
+    if not user:
+        return redirect(url_for("auth.login", role="admin", next=request.url))
+
     tables = list(
         db_session.scalars(select(DiningTable).order_by(DiningTable.name)).all()
     )
@@ -1839,7 +1843,6 @@ def admin_manage_tables():
         total_counts=total_counts,
         active_counts=active_counts,
         highlight_id=request.args.get("highlight", type=int),
-        regenerate_token_url=url_for("main.admin_regenerate_table_token"),
     )
 
 
