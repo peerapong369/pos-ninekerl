@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 from collections import defaultdict
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -153,8 +154,17 @@ def _save_store_hours(hours: Dict[str, Dict[str, str | bool]]) -> None:
     db_session.commit()
 
 
+def _store_timezone() -> ZoneInfo:
+    tz_name = current_app.config.get("STORE_TIMEZONE", "Asia/Bangkok")
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        return ZoneInfo("UTC")
+
+
 def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
-    now = now or datetime.now()
+    tz = _store_timezone()
+    now = now or datetime.now(tz)
     hours = _get_store_hours()
     weekday_keys = [
         "monday",
@@ -200,7 +210,12 @@ def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
                 next_open_label = f"{label_day} เวลา {info.get('start')}"
                 break
 
-    return {"open": open_now, "next_open": next_open_label}
+    return {
+        "open": open_now,
+        "next_open": next_open_label,
+        "current_time": now.strftime("%H:%M"),
+        "timezone": tz.key,
+    }
 
 
 def _save_menu_image(file_storage) -> str:

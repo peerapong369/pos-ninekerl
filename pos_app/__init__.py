@@ -31,6 +31,7 @@ def create_app():
         LINE_CHANNEL_ACCESS_TOKEN=os.getenv("LINE_CHANNEL_ACCESS_TOKEN"),
         LINE_CHANNEL_SECRET=os.getenv("LINE_CHANNEL_SECRET"),
         TABLE_MENU_BASE_URL=os.getenv("TABLE_MENU_BASE_URL"),
+        STORE_TIMEZONE=os.getenv("STORE_TIMEZONE", "Asia/Bangkok"),
     )
 
     upload_dir = BASE_DIR / "static" / "uploads" / "menu"

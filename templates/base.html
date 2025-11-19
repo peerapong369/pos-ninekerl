@@ -75,7 +75,7 @@
         if (isAdmin || !isTablePage) {
           return;
         }
-        const timeout = 20 * 60 * 1000;
+        const timeout = 5 * 60 * 1000;
         let timer = null;
         const redirectToLogin = () => {
           window.location.href = "{{ url_for('auth.login', role='kitchen') }}";
