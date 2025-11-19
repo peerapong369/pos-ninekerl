@@ -32,6 +32,7 @@ from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from werkzeug.utils import secure_filename
 
 from .database import db_session
@@ -166,6 +167,13 @@ def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
     tz = _store_timezone()
     now = now or datetime.now(tz)
     hours = _get_store_hours()
+    if not hours:
+        return {
+            "open": True,
+            "next_open": None,
+            "current_time": now.strftime("%H:%M"),
+            "timezone": tz.key,
+        }
     weekday_keys = [
         "monday",
         "tuesday",
@@ -489,6 +497,39 @@ def kitchen_dashboard():
         ]
     )
     return render_template("kitchen.html", orders=orders)
+
+
+@main_blueprint.route("/kitchen/orders-board")
+@login_required("kitchen")
+def kitchen_orders_board():
+    orders = (
+        db_session.query(Order)
+        .options(
+            selectinload(Order.items)
+            .selectinload(OrderItem.menu_item)
+            .selectinload(MenuItem.category)
+        )
+        .filter(Order.status != OrderStatusEnum.PAID.value)
+        .order_by(Order.created_at.asc())
+        .all()
+    )
+
+    noodle_orders = []
+    for order in orders:
+        noodle_items = []
+        for item in order.items:
+            category_name = (item.menu_item.category.name if item.menu_item and item.menu_item.category else "")
+            if "ก๋วยเตี๋ยว" in (category_name or ""):
+                noodle_items.append(item)
+        if not noodle_items:
+            continue
+        noodle_orders.append((order, noodle_items))
+
+    return render_template(
+        "kitchen_orders_table.html",
+        orders=noodle_orders,
+        status_labels=STATUS_LABELS,
+    )
 
 
 @main_blueprint.route("/api/menu")

@@ -1175,6 +1175,11 @@ textarea:focus {
   box-shadow: 0 6px 16px rgba(63, 42, 32, 0.12);
 }
 
+.kitchen-orders .row-served {
+  color: #777;
+  opacity: 0.6;
+}
+
 .data-table.compact th,
 .data-table.compact td {
   padding: 0.55rem 0.65rem;

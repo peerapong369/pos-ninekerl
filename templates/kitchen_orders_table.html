@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}บอร์ดออเดอร์ก๋วยเตี๋ยว - ครัว{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <h2>บอร์ดออเดอร์ก๋วยเตี๋ยว</h2>
+    <div class="panel-header-actions">
+      <button class="button button-outline" id="fontDown">A-</button>
+      <button class="button button-outline" id="fontUp">A+</button>
+      <a class="button" href="{{ url_for('main.kitchen_dashboard') }}">กลับหน้าแสดงผลหน้าหลัก</a>
+    </div>
+  </div>
+  {% if not orders %}
+  <p>ยังไม่มีออเดอร์ก๋วยเตี๋ยวในขณะนี้</p>
+  {% else %}
+  <div class="table-wrapper">
+    <table class="data-table kitchen-orders" id="ordersTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>โต๊ะ</th>
+          <th>สถานะ</th>
+          <th>เมนู</th>
+          <th>เวลาสั่ง</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for order, items in orders %}
+        {% set is_served = order.status == 'completed' %}
+        <tr class="{{ 'row-served' if is_served else '' }}">
+          <td>#{{ order.id }}</td>
+          <td>{{ order.table.name if order.table else '-' }}</td>
+          <td>
+            <span class="status-label status-{{ order.status }}">{{ status_labels.get(order.status, order.status) }}</span>
+          </td>
+          <td>
+            <ul class="compact-list">
+              {% for item in items %}
+              <li>{{ item.quantity }} x {{ item.menu_item.name }}</li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td>{{ order.created_at.strftime("%H:%M") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const table = document.getElementById("ordersTable");
+    const down = document.getElementById("fontDown");
+    const up = document.getElementById("fontUp");
+    let size = 1;
+    function refresh() {
+      if (table) {
+        table.style.fontSize = `${size}rem`;
+      }
+    }
+    if (down) {
+      down.addEventListener("click", () => {
+        size = Math.max(0.8, size - 0.1);
+        refresh();
+      });
+    }
+    if (up) {
+      up.addEventListener("click", () => {
+        size = Math.min(1.5, size + 0.1);
+        refresh();
+      });
+    }
+    refresh();
+  })();
+</script>
+{% endblock %}

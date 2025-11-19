@@ -4,8 +4,13 @@
 
 {% block content %}
 <section class="panel">
-  <h2>ออเดอร์เข้าครัว</h2>
-  <p>ระบบจะอัปเดตออเดอร์ใหม่อัตโนมัติทุก 5 วินาที พร้อมเสียงแจ้งเตือนเมื่อมีออเดอร์ใหม่</p>
+  <div class="panel-header">
+    <div>
+      <h2>ออเดอร์เข้าครัว</h2>
+      <p>ระบบจะอัปเดตออเดอร์ใหม่อัตโนมัติทุก 5 วินาที พร้อมเสียงแจ้งเตือนเมื่อมีออเดอร์ใหม่</p>
+    </div>
+    <a class="button button-outline" href="{{ url_for('main.kitchen_orders_board') }}">ดูบอร์ดก๋วยเตี๋ยวแบบตาราง</a>
+  </div>
 </section>
 
 <section class="orders-grid" id="kitchenOrders">
