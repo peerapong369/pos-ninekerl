@@ -226,6 +226,31 @@ def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
     }
 
 
+def _parse_order_item_details(note: str | None) -> Dict[str, str]:
+    result = {"noodle": "", "extras": "", "other": ""}
+    if not note:
+        return result
+    parts = [part.strip() for part in note.split("|") if part.strip()]
+    extras_parts = []
+    other_parts = []
+    for part in parts:
+        if ":" in part:
+            label, value = [seg.strip() for seg in part.split(":", 1)]
+            if "เส้น" in label:
+                result["noodle"] = value
+            elif "เพิ่ม" in label or "พิเศษ" in label:
+                extras_parts.append(value)
+            else:
+                other_parts.append(value)
+        else:
+            other_parts.append(part)
+    if extras_parts:
+        result["extras"] = ", ".join(extras_parts)
+    if other_parts:
+        result["other"] = " | ".join(other_parts)
+    return result
+
+
 def _save_menu_image(file_storage) -> str:
     if not file_storage or not file_storage.filename:
         raise ValueError("กรุณาเลือกรูปภาพที่ต้องการอัปโหลด")
@@ -519,8 +544,18 @@ def kitchen_orders_board():
         noodle_items = []
         for item in order.items:
             category_name = (item.menu_item.category.name if item.menu_item and item.menu_item.category else "")
-            if "ก๋วยเตี๋ยว" in (category_name or ""):
-                noodle_items.append(item)
+            if "ก๋วยเตี๋ยว" not in (category_name or ""):
+                continue
+            details = _parse_order_item_details(item.note)
+            noodle_items.append(
+                {
+                    "name": item.menu_item.name if item.menu_item else "-",
+                    "quantity": item.quantity,
+                    "noodle": details["noodle"],
+                    "extras": details["extras"],
+                    "other": details["other"],
+                }
+            )
         if not noodle_items:
             continue
         noodle_orders.append((order, noodle_items))

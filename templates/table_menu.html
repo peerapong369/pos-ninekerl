@@ -112,6 +112,10 @@
     </header>
     <div class="menu-modal__body">
       <div id="optionGroupsContainer"></div>
+      <section class="modal-section">
+        <h4>หมายเหตุเพิ่มเติม</h4>
+        <input type="text" id="customizerNote" maxlength="30" placeholder="ใส่ข้อความ 30 ตัวอักษร" />
+      </section>
       <section class="modal-section" id="specialSection" hidden>
         <h4>เพิ่มความพิเศษ</h4>
         <label class="checkbox special-option">
@@ -145,7 +149,7 @@
 {% block scripts %}
 <script>
   const tableCode = "{{ table.code }}";
-  const tableToken = "{{ table.access_token or '' }}";
+  window.TABLE_TOKEN = "{{ table.access_token or '' }}";
   window.MENU_CONFIGS = {{ menu_configs | tojson }};
 
   // ป้องกันการย้อนกลับเข้าเพจหลังออกไปแล้ว

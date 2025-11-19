@@ -8,7 +8,7 @@ const submitBtn = document.getElementById("submitOrder");
 const noteField = document.getElementById("orderNote");
 const activeOrdersSection = document.getElementById("activeOrdersSection");
 const activeOrdersList = document.getElementById("activeOrders");
-const tableToken = window.tableToken || "";
+const tableToken = window.TABLE_TOKEN || "";
 
 const modal = document.getElementById("menuCustomizer");
 const modalTitle = document.getElementById("customizerTitle");
@@ -23,6 +23,7 @@ const addBtn = document.getElementById("customizerAdd");
 const cancelBtn = document.getElementById("customizerCancel");
 const closeBtn = document.getElementById("customizerClose");
 const modalBackdrop = modal ? modal.querySelector(".menu-modal__backdrop") : null;
+const noteInput = document.getElementById("customizerNote");
 const specialSection = document.getElementById("specialSection");
 const specialToggle = document.getElementById("specialToggle");
 const specialLabel = document.getElementById("specialLabel");
@@ -175,12 +176,16 @@ function addCustomizedItem(state) {
   const unitPrice = state.currentUnitPrice ?? calculateUnitPrice(state.basePrice, state.selections);
   const selectionNote = buildSelectionNote(state.selections);
   const specialNote = buildSpecialNote(state);
+  const extraNote = state.note ? state.note.trim() : null;
   const noteParts = [];
   if (selectionNote) {
     noteParts.push(selectionNote);
   }
   if (specialNote) {
     noteParts.push(specialNote);
+  }
+  if (extraNote) {
+    noteParts.push(extraNote);
   }
   const note = noteParts.length ? noteParts.join(" | ") : null;
 
@@ -572,6 +577,7 @@ function openCustomization(menuItemId, name, basePrice, config, description, ima
         }
       : null,
     specialSelected: false,
+    note: "",
   };
 
   initializeSelections(normalizedConfig.groups);
@@ -593,6 +599,9 @@ function openCustomization(menuItemId, name, basePrice, config, description, ima
 
   modal.hidden = false;
   document.body.classList.add("modal-open");
+  if (noteInput) {
+    noteInput.value = "";
+  }
 }
 
 function closeCustomization() {
@@ -810,5 +819,13 @@ if (specialToggle) {
     }
     modalState.specialSelected = specialToggle.checked;
     updateModalSummary();
+  });
+}
+
+if (noteInput) {
+  noteInput.addEventListener("input", () => {
+    if (modalState) {
+      modalState.note = noteInput.value || "";
+    }
   });
 }

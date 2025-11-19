@@ -23,6 +23,9 @@
           <th>โต๊ะ</th>
           <th>สถานะ</th>
           <th>เมนู</th>
+          <th>ประเภทเส้น</th>
+          <th>พิเศษ / เพิ่ม</th>
+          <th>รายละเอียดอื่น</th>
           <th>เวลาสั่ง</th>
         </tr>
       </thead>
@@ -38,7 +41,36 @@
           <td>
             <ul class="compact-list">
               {% for item in items %}
-              <li>{{ item.quantity }} x {{ item.menu_item.name }}</li>
+              <li>{{ item.quantity }} x {{ item.name }}</li>
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            <ul class="compact-list">
+              {% for item in items %}
+              {% if item.noodle %}
+              <li>{{ item.noodle }}</li>
+              {% else %}
+              <li>-</li>
+              {% endif %}
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            <ul class="compact-list">
+              {% for item in items %}
+              {% if item.extras %}
+              <li>{{ item.extras }}</li>
+              {% else %}
+              <li>-</li>
+              {% endif %}
+              {% endfor %}
+            </ul>
+          </td>
+          <td>
+            <ul class="compact-list">
+              {% for item in items %}
+              <li>{{ item.other or '-' }}</li>
               {% endfor %}
             </ul>
           </td>

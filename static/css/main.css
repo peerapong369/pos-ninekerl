@@ -1676,3 +1676,6 @@ details[open] summary {
     align-items: flex-start;
   }
 }
+.kitchen-orders {
+  width: 100%;
+}
