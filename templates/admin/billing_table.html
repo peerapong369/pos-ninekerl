@@ -10,6 +10,9 @@
       <p>เลือกรายการที่ยังไม่ได้เก็บเงิน เพื่อสร้าง QR PromptPay รวมยอดและยืนยันการชำระ</p>
     </div>
     <a class="button button-outline" href="{{ url_for('main.admin_billing_overview') }}">ย้อนกลับ</a>
+    {% if table_order_url %}
+    <a class="button button-primary" href="{{ table_order_url }}" target="_blank" rel="noopener">เพิ่มรายการสั่งซื้อ</a>
+    {% endif %}
   </header>
   {% if promptpay_target %}
   <p class="muted">PromptPay สำหรับรับชำระ: <strong>{{ promptpay_target }}</strong></p>

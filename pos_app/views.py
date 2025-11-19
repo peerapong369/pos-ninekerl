@@ -1182,6 +1182,10 @@ def admin_billing_table_view(table_code: str):
         .all()
     )
     raw_target, normalized_target = _promptpay_config()
+    table_url = None
+    if table.access_token:
+        table_url = _build_table_menu_url(table.code)
+        table_url = f"{table_url}?token={table.access_token}"
     return render_template(
         "admin/billing_table.html",
         table=table,
@@ -1190,6 +1194,7 @@ def admin_billing_table_view(table_code: str):
         promptpay_target=raw_target,
         promptpay_ready=bool(normalized_target),
         store_status=_store_status(),
+        table_order_url=table_url,
     )
 
 
