@@ -93,3 +93,13 @@ def _upgrade_schema(engine) -> None:
                     "ALTER TABLE menu_items ADD COLUMN special_price_delta NUMERIC(10,2) NOT NULL DEFAULT 0"
                 )
             )
+
+        table_columns = {
+            row["name"]
+            for row in connection.execute(text("PRAGMA table_info('dining_tables')")).mappings()
+        }
+
+        if "access_token" not in table_columns:
+            connection.execute(
+                text("ALTER TABLE dining_tables ADD COLUMN access_token VARCHAR(64) NULL")
+            )

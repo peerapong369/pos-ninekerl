@@ -75,6 +75,9 @@
               <form method="post" action="{{ url_for('main.admin_delete_table_entry', table_id=table.id) }}" onsubmit="return confirm('ต้องการลบ {{ table.name }} หรือไม่?');">
                 <button type="submit" class="button button-small button-outline" {% if total > 0 %}disabled title="ไม่สามารถลบโต๊ะที่มีประวัติคำสั่งซื้อ"{% endif %}>ลบ</button>
               </form>
+              <form method="post" action="{{ url_for('main.admin_regenerate_table_token', table_id=table.id) }}" onsubmit="return confirm('สร้างโทเคนใหม่สำหรับ {{ table.name }} หรือไม่? จะต้องพิมพ์ QR ใหม่');">
+                <button type="submit" class="button button-small button-outline">โทเคนใหม่</button>
+              </form>
             </div>
           </td>
         </tr>

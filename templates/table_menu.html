@@ -142,6 +142,7 @@
 {% block scripts %}
 <script>
   const tableCode = "{{ table.code }}";
+  const tableToken = "{{ table.access_token or '' }}";
   window.MENU_CONFIGS = {{ menu_configs | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/table.js') }}"></script>

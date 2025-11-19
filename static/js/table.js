@@ -8,6 +8,7 @@ const submitBtn = document.getElementById("submitOrder");
 const noteField = document.getElementById("orderNote");
 const activeOrdersSection = document.getElementById("activeOrdersSection");
 const activeOrdersList = document.getElementById("activeOrders");
+const tableToken = window.tableToken || "";
 
 const modal = document.getElementById("menuCustomizer");
 const modalTitle = document.getElementById("customizerTitle");
@@ -260,6 +261,7 @@ async function submitOrder() {
         table_code: tableCode,
         items: itemsPayload,
         note: noteField.value.trim() || null,
+        token: tableToken,
       }),
     });
 

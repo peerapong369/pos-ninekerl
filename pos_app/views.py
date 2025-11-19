@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
+import secrets
 
 from flask import (
     Blueprint,
@@ -24,6 +25,7 @@ from flask import (
 import csv
 import qrcode
 import json
+import urllib.parse
 from PIL import Image, ImageDraw, ImageFont
 from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError, LineBotApiError
@@ -383,6 +385,10 @@ def table_menu(table_code: str):
     if not table:
         abort(404, description="Table not found")
 
+    token = request.args.get("token", "").strip()
+    if table.access_token and token != table.access_token:
+        abort(403, description="ไม่สามารถเข้าหน้าโต๊ะนี้ได้ (QR ไม่ถูกต้อง)")
+
     categories = db_session.scalars(
         select(MenuCategory).order_by(MenuCategory.position, MenuCategory.name)
     ).all()
@@ -519,6 +525,10 @@ def api_create_order():
     if not table:
         abort(404, description="Table not found")
 
+    token = payload.get("token", "")
+    if table.access_token and token != table.access_token:
+        abort(403, description=" ไม่สามารถสั่งซื้อได้จากลิงก์นี้")
+
     status = _store_status()
     if status.get("open") is False:
         message = "ขณะนี้ร้านปิดอยู่"
@@ -526,6 +536,19 @@ def api_create_order():
         if next_open:
             message = f"ขณะนี้ร้านปิดอยู่ จะเปิดอีกครั้ง {next_open}"
         abort(403, description=message)
+
+    # Simple rate limit per session toลดสแปม
+    rate = session.get("order_rate") or {}
+    now_ts = datetime.utcnow().timestamp()
+    window_ts = rate.get("window_ts", 0)
+    count = rate.get("count", 0)
+    if now_ts - window_ts <= 60:
+        if count >= 5:
+            abort(429, description="ส่งคำสั่งซื้อมากเกินไป รอสักครู่แล้วลองใหม่")
+        rate["count"] = count + 1
+    else:
+        rate = {"window_ts": now_ts, "count": 1}
+    session["order_rate"] = rate
 
     order = Order(table=table, status=OrderStatusEnum.PENDING.value, note=note)
     db_session.add(order)
@@ -1816,6 +1839,7 @@ def admin_manage_tables():
         total_counts=total_counts,
         active_counts=active_counts,
         highlight_id=request.args.get("highlight", type=int),
+        regenerate_token_url=url_for("main.admin_regenerate_table_token"),
     )
 
 
@@ -1834,6 +1858,7 @@ def admin_create_table_entry():
         return redirect(url_for("main.admin_manage_tables"))
 
     table = DiningTable(name=name, code=code)
+    table.access_token = secrets.token_hex(16)
     db_session.add(table)
     db_session.commit()
     flash("เพิ่มโต๊ะใหม่เรียบร้อย", "success")
@@ -1893,6 +1918,18 @@ def admin_delete_table_entry(table_id: int):
     return redirect(url_for("main.admin_manage_tables"))
 
 
+@main_blueprint.route("/admin/tables/<int:table_id>/token", methods=["POST"])
+@login_required("admin")
+def admin_regenerate_table_token(table_id: int):
+    table = db_session.get(DiningTable, table_id)
+    if not table:
+        abort(404, description="Table not found")
+    table.access_token = secrets.token_hex(16)
+    db_session.commit()
+    flash("สร้างโทเคนใหม่สำหรับโต๊ะเรียบร้อย", "success")
+    return redirect(url_for("main.admin_manage_tables", highlight=table.id))
+
+
 @main_blueprint.route("/admin/tables/<int:table_id>/qr.png")
 @login_required("admin")
 def admin_table_qr_image(table_id: int):
@@ -1900,7 +1937,13 @@ def admin_table_qr_image(table_id: int):
     if not table:
         abort(404, description="Table not found")
 
+    params = {}
+    if table.access_token:
+        params["token"] = table.access_token
     target_url = _build_table_menu_url(table.code)
+    if params:
+        query = urllib.parse.urlencode(params)
+        target_url = f"{target_url}?{query}"
     qr = qrcode.QRCode(version=2, border=3)
     qr.add_data(target_url)
     qr.make(fit=True)

@@ -38,6 +38,7 @@ class DiningTable(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)
+    access_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     orders: Mapped[List["Order"]] = relationship(
         "Order", back_populates="table", cascade="all, delete-orphan"
@@ -377,9 +378,11 @@ def seed_sample_data(force: bool = False) -> None:
         db_session.query(DiningTable).delete(synchronize_session=False)
         db_session.commit()
 
+    import secrets
+
     if db_session.query(DiningTable).count() == 0:
         tables = [
-            DiningTable(name=f"โต๊ะ {idx}", code=f"T{idx}")
+            DiningTable(name=f"โต๊ะ {idx}", code=f"T{idx}", access_token=secrets.token_hex(16))
             for idx in range(1, 7)
         ]
         db_session.add_all(tables)
