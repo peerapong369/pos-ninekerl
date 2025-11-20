@@ -30,6 +30,10 @@ const confirmTotalLabel = document.getElementById("confirmTotal");
 const confirmCloseBtn = document.getElementById("confirmClose");
 const confirmContinueBtn = document.getElementById("confirmContinue");
 const confirmSubmitBtn = document.getElementById("confirmSubmit");
+const storeClosedModal = document.getElementById("storeClosedModal");
+const storeClosedBackdrop = storeClosedModal ? storeClosedModal.querySelector(".menu-modal__backdrop") : null;
+const storeClosedCloseBtn = document.getElementById("storeClosedClose");
+const storeClosedOkBtn = document.getElementById("storeClosedOk");
 const noteInput = document.getElementById("customizerNote");
 const specialSection = document.getElementById("specialSection");
 const specialToggle = document.getElementById("specialToggle");
@@ -306,7 +310,11 @@ async function submitOrder() {
     closeConfirmModal();
   } catch (error) {
     console.error(error);
-    orderStatusMessage.textContent = error.message || "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง";
+    if (error.message && error.message.includes("ร้านปิด")) {
+      showStoreClosedModal();
+    } else {
+      orderStatusMessage.textContent = error.message || "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง";
+    }
   } finally {
     submitBtn.disabled = orderState.size === 0;
   }
@@ -668,6 +676,22 @@ function closeConfirmModal() {
   document.body.classList.remove("modal-open");
 }
 
+function showStoreClosedModal() {
+  if (!storeClosedModal) {
+    return;
+  }
+  storeClosedModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeStoreClosedModal() {
+  if (!storeClosedModal) {
+    return;
+  }
+  storeClosedModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
 function updateSpecialSection() {
   if (!specialSection || !specialToggle || !specialLabel || !modalState) {
     return;
@@ -813,8 +837,8 @@ if (confirmBackdrop) {
   confirmBackdrop.addEventListener("click", () => closeConfirmModal());
 }
 
-if (confirmBackdrop) {
-  confirmBackdrop.addEventListener("click", () => closeConfirmModal());
+if (storeClosedBackdrop) {
+  storeClosedBackdrop.addEventListener("click", () => closeStoreClosedModal());
 }
 
 if (addBtn) {
@@ -882,6 +906,14 @@ if (confirmSubmitBtn) {
   confirmSubmitBtn.addEventListener("click", () => {
     submitOrder();
   });
+}
+
+if (storeClosedCloseBtn) {
+  storeClosedCloseBtn.addEventListener("click", closeStoreClosedModal);
+}
+
+if (storeClosedOkBtn) {
+  storeClosedOkBtn.addEventListener("click", closeStoreClosedModal);
 }
 
 if (specialToggle) {

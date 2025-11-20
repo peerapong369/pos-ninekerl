@@ -46,6 +46,7 @@
     {% if current_user and 'adminpp' in current_user.roles %}
     <a class="button button-outline" href="{{ url_for('main.admin_game_settings') }}">ตั้งค่าเป้าหมายเกม</a>
     <a class="button button-outline" href="{{ url_for('main.admin_store_hours') }}">ตั้งเวลาเปิด-ปิดร้าน</a>
+    <a class="button button-outline" href="{{ url_for('main.admin_auth_settings') }}">จัดการรหัสผ่าน</a>
     {% endif %}
   </div>
 </section>

@@ -29,7 +29,7 @@
           <th>เวลาสั่ง</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="ordersBody">
         {% for order, items in orders %}
         {% set is_served = order.status == 'completed' %}
         <tr class="{{ 'row-served' if is_served else '' }}">
@@ -109,6 +109,57 @@
       });
     }
     refresh();
+
+    const body = document.getElementById("ordersBody");
+    async function fetchOrders() {
+      try {
+        const response = await fetch("/api/kitchen/noodle-orders");
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        renderOrders(data.orders || []);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    function renderOrders(orders) {
+      if (!body) {
+        return;
+      }
+      if (!orders.length) {
+        body.innerHTML = '<tr><td colspan="8">ยังไม่มีออเดอร์ก๋วยเตี๋ยวในขณะนี้</td></tr>';
+        return;
+      }
+      body.innerHTML = orders
+        .map((entry) => {
+          const itemRows = entry.items
+            .map((item) => `<li>${item.quantity} x ${item.name}</li>`)
+            .join("");
+          const noodleRows = entry.items.map((item) => `<li>${item.noodle || "-"}</li>`).join("");
+          const extrasRows = entry.items.map((item) => `<li>${item.extras || "-"}</li>`).join("");
+          const otherRows = entry.items.map((item) => `<li>${item.other || "-"}</li>`).join("");
+          const served = entry.status === "completed" ? "row-served" : "";
+          const created = new Date(entry.created_at).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+          return `
+            <tr class="${served}">
+              <td>#${entry.id}</td>
+              <td>${entry.table}</td>
+              <td><span class="status-label status-${entry.status}">${entry.status_label || entry.status}</span></td>
+              <td><ul class="compact-list">${itemRows}</ul></td>
+              <td><ul class="compact-list">${noodleRows}</ul></td>
+              <td><ul class="compact-list">${extrasRows}</ul></td>
+              <td><ul class="compact-list">${otherRows}</ul></td>
+              <td>${created}</td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    fetchOrders();
+    setInterval(fetchOrders, 5000);
   })();
 </script>
 {% endblock %}

@@ -13,6 +13,10 @@ from flask import (
     url_for,
 )
 
+from .database import db_session
+from .models import Setting
+from sqlalchemy import select
+
 F = TypeVar("F", bound=Callable[..., object])
 
 auth_blueprint = Blueprint("auth", __name__, url_prefix="/auth")
@@ -48,8 +52,10 @@ def login():
         password = request.form.get("password", "")
 
         user_config = current_app.config["AUTH_USERS"].get(role)
+        override_password = _get_override_password(role)
+        valid_password = override_password or (user_config.get("password") if user_config else None)
 
-        if user_config and username == user_config["username"] and password == user_config["password"]:
+        if user_config and username == user_config["username"] and valid_password == password:
             session["user"] = {
                 "username": username,
                 "roles": user_config.get("roles", [role]),
@@ -70,3 +76,10 @@ def login():
 def logout():
     session.pop("user", None)
     return redirect(url_for("main.home"))
+
+
+def _get_override_password(role: str) -> str | None:
+    key = f"auth_{role}_password"
+    stmt = select(Setting.value).where(Setting.key == key)
+    result = db_session.execute(stmt).scalar_one_or_none()
+    return result

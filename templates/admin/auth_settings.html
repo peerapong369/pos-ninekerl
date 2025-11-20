@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่าบัญชีเข้าใช้งาน - Admin++{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2>ตั้งค่ารหัสผ่านผู้ใช้ระบบ</h2>
+  <p>Admin++ สามารถเปลี่ยนรหัสผ่านบัญชีครัวและผู้ดูแลได้จากหน้านี้</p>
+
+  <div class="panel-grid">
+    <form method="post" action="{{ url_for('main.admin_auth_settings') }}" class="form-grid">
+      <input type="hidden" name="target" value="kitchen" />
+      <h3>บัญชีครัว</h3>
+      <label>
+        รหัสผ่านใหม่
+        <input type="password" name="password" required minlength="4" />
+      </label>
+      <label>
+        ยืนยันรหัสผ่าน
+        <input type="password" name="password_confirm" required minlength="4" />
+      </label>
+      <div class="form-actions full">
+        <button type="submit" class="button button-primary">บันทึกรหัสครัว</button>
+      </div>
+      <small class="muted">* บัญชีปัจจุบัน: kitchen / ********</small>
+    </form>
+
+    <form method="post" action="{{ url_for('main.admin_auth_settings') }}" class="form-grid">
+      <input type="hidden" name="target" value="admin" />
+      <h3>บัญชีผู้ดูแล</h3>
+      <label>
+        รหัสผ่านใหม่
+        <input type="password" name="password" required minlength="4" />
+      </label>
+      <label>
+        ยืนยันรหัสผ่าน
+        <input type="password" name="password_confirm" required minlength="4" />
+      </label>
+      <div class="form-actions full">
+        <button type="submit" class="button button-primary">บันทึกรหัสผู้ดูแล</button>
+      </div>
+      <small class="muted">* บัญชีปัจจุบัน: admin / ********</small>
+    </form>
+  </div>
+</section>
+{% endblock %}

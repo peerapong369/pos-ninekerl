@@ -165,6 +165,25 @@
     </footer>
   </div>
 </div>
+
+<div class="menu-modal" id="storeClosedModal" hidden>
+  <div class="menu-modal__backdrop" data-dismiss="store"></div>
+  <div class="menu-modal__dialog" role="dialog" aria-modal="true">
+    <button type="button" class="menu-modal__close" id="storeClosedClose" aria-label="ปิดหน้าต่าง">&times;</button>
+    <header class="menu-modal__header">
+      <h3>ยังไม่ถึงเวลาเปิดร้าน</h3>
+      <p class="muted">{{ store_status.next_open or 'กรุณาสอบถามพนักงาน' }}</p>
+    </header>
+    <div class="menu-modal__body">
+      <p>ลูกค้าสามารถสั่งได้ช่วงเวลาเปิดร้านเท่านั้น</p>
+    </div>
+    <footer class="menu-modal__footer">
+      <div class="modal-actions">
+        <button type="button" class="button button-primary" id="storeClosedOk">รับทราบ</button>
+      </div>
+    </footer>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

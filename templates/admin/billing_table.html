@@ -10,7 +10,7 @@
       <p>เลือกรายการที่ยังไม่ได้เก็บเงิน เพื่อสร้าง QR PromptPay รวมยอดและยืนยันการชำระ</p>
     </div>
     <a class="button button-outline" href="{{ url_for('main.admin_billing_overview') }}">ย้อนกลับ</a>
-    {% if table_order_url %}
+    {% if table_order_url and current_user and ('adminpp' in current_user.roles or 'admin' in current_user.roles) %}
     <a class="button button-primary" href="{{ table_order_url }}" target="_blank" rel="noopener">เพิ่มรายการสั่งซื้อ</a>
     {% endif %}
   </header>
@@ -35,13 +35,14 @@
     <div class="table-wrapper">
       <table class="data-table billing-table">
         <thead>
-          <tr>
-            <th>เลือก</th>
-            <th>ออเดอร์</th>
-            <th>เมนู / หมายเหตุ</th>
-            <th>ยอดรวม</th>
-            <th>สถานะ</th>
-          </tr>
+        <tr>
+          <th>เลือก</th>
+          <th>ออเดอร์</th>
+          <th>เมนู / หมายเหตุ</th>
+          <th>ยอดรวม</th>
+          <th>สถานะ</th>
+          <th>ยกเลิก</th>
+        </tr>
         </thead>
         <tbody>
           {% for order in orders %}
@@ -96,6 +97,15 @@
               {% endif %}
             </td>
             <td>{{ status_labels.get(order.status, order.status) }}</td>
+            <td>
+              {% if order.status != 'paid' %}
+              <form method="post" action="{{ url_for('main.admin_cancel_order', table_code=table.code, order_id=order.id) }}" onsubmit="return confirm('ยืนยันยกเลิกออเดอร์ #{{ order.id }} หรือไม่?');">
+                <button type="submit" class="button button-small button-outline">ยกเลิก</button>
+              </form>
+              {% else %}
+              <span class="muted">-</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>

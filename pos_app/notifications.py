@@ -62,14 +62,18 @@ def _load_config() -> Dict[str, Optional[str]]:
 
 def _build_order_summary(order: Order) -> Dict[str, object]:
     try:
-        items = [
-            {
-                "name": item.menu_item.name,
-                "quantity": item.quantity,
-                "price": float(item.menu_item.price),
-            }
-            for item in order.items
-        ]
+        items = []
+        for item in order.items:
+            name = item.menu_item.name if item.menu_item else "-"
+            details = _parse_item_note(item.note)
+            items.append(
+                {
+                    "name": name,
+                    "quantity": item.quantity,
+                    "price": float(item.menu_item.price if item.menu_item else 0),
+                    "details": details,
+                }
+            )
         return {
             "id": order.id,
             "table": order.table.name,
@@ -80,6 +84,35 @@ def _build_order_summary(order: Order) -> Dict[str, object]:
         }
     except Exception:
         return {}
+
+
+def _parse_item_note(note: str | None) -> Dict[str, str]:
+    result = {"noodle": "", "extras": "", "other": ""}
+    if not note:
+        return result
+    parts = [part.strip() for part in note.split("|") if part.strip()]
+    extras = []
+    others = []
+    for part in parts:
+        lowered = part.lower()
+        if ":" in part:
+            label, value = [seg.strip() for seg in part.split(":", 1)]
+            if "เส้น" in label:
+                result["noodle"] = value
+            elif "เพิ่ม" in label or "พิเศษ" in label:
+                extras.append(value)
+            else:
+                others.append(value)
+        else:
+            if "เพิ่ม" in lowered or "พิเศษ" in lowered:
+                extras.append(part)
+            else:
+                others.append(part)
+    if extras:
+        result["extras"] = ", ".join(extras)
+    if others:
+        result["other"] = " | ".join(others)
+    return result
 
 
 def _send_notifications(
@@ -123,7 +156,16 @@ def _send_email(summary: Dict[str, object], config: Dict[str, Optional[str]]) ->
         "รายการอาหาร:",
     ]
     for item in summary["items"]:  # type: ignore[assignment]
-        lines.append(f"- {item['name']} x {item['quantity']}")
+        detail_parts = []
+        details = item.get("details") or {}
+        if details.get("noodle"):
+            detail_parts.append(f"เส้น {details['noodle']}")
+        if details.get("extras"):
+            detail_parts.append(f"พิเศษ {details['extras']}")
+        if details.get("other"):
+            detail_parts.append(details["other"])
+        detail_text = f" ({'; '.join(detail_parts)})" if detail_parts else ""
+        lines.append(f"- {item['name']} x {item['quantity']}{detail_text}")
     lines.append("")
     lines.append(f"ยอดรวม: {summary['total']:.2f} บาท")
 
@@ -154,9 +196,19 @@ def _send_line_message(summary: Dict[str, object], config: Dict[str, Optional[st
     user_ids_raw = config.get("line_user_ids", "")
     user_ids = [user_id.strip() for user_id in user_ids_raw.split(",") if user_id.strip()]
 
-    items_text = "\n".join(
-        f"- {item['name']} x {item['quantity']}" for item in summary["items"]  # type: ignore
-    )
+    item_lines = []
+    for item in summary["items"]:  # type: ignore
+        detail_parts = []
+        details = item.get("details") or {}
+        if details.get("noodle"):
+            detail_parts.append(f"เส้น {details['noodle']}")
+        if details.get("extras"):
+            detail_parts.append(f"พิเศษ {details['extras']}")
+        if details.get("other"):
+            detail_parts.append(details["other"])
+        detail_text = f" ({' | '.join(detail_parts)})" if detail_parts else ""
+        item_lines.append(f"- {item['name']} x {item['quantity']}{detail_text}")
+    items_text = "\n".join(item_lines)
     message = TextSendMessage(
         f"🍜 ออเดอร์ใหม่ #{summary['id']}\n"
         f"โต๊ะ: {summary['table']} ({summary['table_code']})\n"

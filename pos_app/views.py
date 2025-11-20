@@ -155,6 +155,22 @@ def _save_store_hours(hours: Dict[str, Dict[str, str | bool]]) -> None:
     db_session.commit()
 
 
+def _get_auth_password(role: str) -> str | None:
+    key = f"auth_{role}_password"
+    setting = db_session.query(Setting).filter(Setting.key == key).one_or_none()
+    return setting.value if setting and setting.value else None
+
+
+def _set_auth_password(role: str, password: str) -> None:
+    key = f"auth_{role}_password"
+    setting = db_session.query(Setting).filter(Setting.key == key).one_or_none()
+    if setting:
+        setting.value = password
+    else:
+        db_session.add(Setting(key=key, value=password))
+    db_session.commit()
+
+
 def _store_timezone() -> ZoneInfo:
     tz_name = current_app.config.get("STORE_TIMEZONE", "Asia/Bangkok")
     try:
@@ -234,6 +250,7 @@ def _parse_order_item_details(note: str | None) -> Dict[str, str]:
     extras_parts = []
     other_parts = []
     for part in parts:
+        lowered = part.lower()
         if ":" in part:
             label, value = [seg.strip() for seg in part.split(":", 1)]
             if "เส้น" in label:
@@ -243,7 +260,10 @@ def _parse_order_item_details(note: str | None) -> Dict[str, str]:
             else:
                 other_parts.append(value)
         else:
-            other_parts.append(part)
+            if "เพิ่ม" in lowered or "พิเศษ" in lowered:
+                extras_parts.append(part)
+            else:
+                other_parts.append(part)
     if extras_parts:
         result["extras"] = ", ".join(extras_parts)
     if other_parts:
@@ -437,6 +457,10 @@ def table_menu(table_code: str):
     if not table:
         abort(404, description="Table not found")
 
+    if not table.access_token:
+        table.access_token = secrets.token_hex(16)
+        db_session.commit()
+
     token = request.args.get("token", "").strip()
     if table.access_token and token != table.access_token:
         abort(403, description="ไม่สามารถเข้าหน้าโต๊ะนี้ได้ (QR ไม่ถูกต้อง)")
@@ -527,44 +551,30 @@ def kitchen_dashboard():
 @main_blueprint.route("/kitchen/orders-board")
 @login_required("kitchen")
 def kitchen_orders_board():
-    orders = (
-        db_session.query(Order)
-        .options(
-            selectinload(Order.items)
-            .selectinload(OrderItem.menu_item)
-            .selectinload(MenuItem.category)
-        )
-        .filter(Order.status != OrderStatusEnum.PAID.value)
-        .order_by(Order.created_at.asc())
-        .all()
-    )
-
-    noodle_orders = []
-    for order in orders:
-        noodle_items = []
-        for item in order.items:
-            category_name = (item.menu_item.category.name if item.menu_item and item.menu_item.category else "")
-            if "ก๋วยเตี๋ยว" not in (category_name or ""):
-                continue
-            details = _parse_order_item_details(item.note)
-            noodle_items.append(
-                {
-                    "name": item.menu_item.name if item.menu_item else "-",
-                    "quantity": item.quantity,
-                    "noodle": details["noodle"],
-                    "extras": details["extras"],
-                    "other": details["other"],
-                }
-            )
-        if not noodle_items:
-            continue
-        noodle_orders.append((order, noodle_items))
-
+    noodle_orders = _collect_noodle_orders()
     return render_template(
         "kitchen_orders_table.html",
         orders=noodle_orders,
         status_labels=STATUS_LABELS,
     )
+
+
+@main_blueprint.route("/api/kitchen/noodle-orders")
+@login_required("kitchen")
+def api_noodle_orders():
+    payload = []
+    for order, items in _collect_noodle_orders():
+        payload.append(
+            {
+                "id": order.id,
+                "table": order.table.name if order.table else "-",
+                "status": order.status,
+                "status_label": STATUS_LABELS.get(order.status, order.status),
+                "created_at": order.created_at.isoformat(),
+                "items": items,
+            }
+        )
+    return jsonify({"orders": payload})
 
 
 @main_blueprint.route("/api/menu")
@@ -1163,6 +1173,38 @@ def admin_store_hours():
     return render_template("admin/store_hours.html", days=days, hours=current_hours)
 
 
+@main_blueprint.route("/admin/auth-settings", methods=["GET", "POST"])
+@login_required("adminpp")
+def admin_auth_settings():
+    current_admin = _get_auth_password("admin")
+    current_kitchen = _get_auth_password("kitchen")
+
+    if request.method == "POST":
+        target = request.form.get("target")
+        new_password = request.form.get("password", "").strip()
+        confirm_password = request.form.get("password_confirm", "").strip()
+
+        if target not in {"admin", "kitchen"}:
+            flash("ไม่พบประเภทบัญชีที่ต้องการเปลี่ยนรหัส", "error")
+            return redirect(url_for("main.admin_auth_settings"))
+        if not new_password:
+            flash("กรุณาระบุรหัสผ่านใหม่", "error")
+            return redirect(url_for("main.admin_auth_settings"))
+        if new_password != confirm_password:
+            flash("รหัสผ่านยืนยันไม่ตรงกัน", "error")
+            return redirect(url_for("main.admin_auth_settings"))
+
+        _set_auth_password(target, new_password)
+        flash("บันทึกรหัสผ่านใหม่เรียบร้อย", "success")
+        return redirect(url_for("main.admin_auth_settings"))
+
+    return render_template(
+        "admin/auth_settings.html",
+        current_admin=current_admin,
+        current_kitchen=current_kitchen,
+    )
+
+
 @main_blueprint.route("/admin/billing/<string:table_code>")
 @login_required("admin")
 def admin_billing_table_view(table_code: str):
@@ -1196,6 +1238,30 @@ def admin_billing_table_view(table_code: str):
         store_status=_store_status(),
         table_order_url=table_url,
     )
+
+
+@main_blueprint.route("/admin/billing/<string:table_code>/orders/<int:order_id>/cancel", methods=["POST"])
+@login_required("admin")
+def admin_cancel_order(table_code: str, order_id: int):
+    table = db_session.scalar(
+        select(DiningTable).where(DiningTable.code == table_code.upper())
+    )
+    if not table:
+        abort(404, description="Table not found")
+
+    order = db_session.get(Order, order_id)
+    if not order or order.table_id != table.id:
+        abort(404, description="Order not found")
+
+    if order.status == OrderStatusEnum.PAID.value:
+        flash("ไม่สามารถยกเลิกออเดอร์ที่ชำระเงินแล้ว", "error")
+        return redirect(url_for("main.admin_billing_table_view", table_code=table.code))
+
+    _release_stock_for_order(order)
+    db_session.delete(order)
+    db_session.commit()
+    flash(f"ยกเลิกออเดอร์ #{order.id} เรียบร้อย", "success")
+    return redirect(url_for("main.admin_billing_table_view", table_code=table.code))
 
 
 @main_blueprint.route("/admin/billing/qr", methods=["POST"])
@@ -2538,6 +2604,41 @@ def _collect_orders(statuses: List[str]) -> List[Dict[str, Any]]:
     return [_order_to_dict(order) for order in orders]
 
 
+def _collect_noodle_orders() -> List[tuple[Order, List[Dict[str, Any]]]]:
+    orders = (
+        db_session.query(Order)
+        .options(
+            selectinload(Order.items)
+            .selectinload(OrderItem.menu_item)
+            .selectinload(MenuItem.category)
+        )
+        .filter(Order.status != OrderStatusEnum.PAID.value)
+        .order_by(Order.created_at.asc())
+        .all()
+    )
+
+    result: List[tuple[Order, List[Dict[str, Any]]]] = []
+    for order in orders:
+        noodle_items: List[Dict[str, Any]] = []
+        for item in order.items:
+            category_name = (item.menu_item.category.name if item.menu_item and item.menu_item.category else "")
+            if "ก๋วยเตี๋ยว" not in (category_name or ""):
+                continue
+            details = _parse_order_item_details(item.note)
+            noodle_items.append(
+                {
+                    "name": item.menu_item.name if item.menu_item else "-",
+                    "quantity": item.quantity,
+                    "noodle": details["noodle"],
+                    "extras": details["extras"],
+                    "other": details["other"],
+                }
+            )
+        if noodle_items:
+            result.append((order, noodle_items))
+    return result
+
+
 def _backfill_invoices(order_ids: List[int] | None = None) -> None:
     query = db_session.query(Order).filter(Order.status == OrderStatusEnum.PAID.value)
     if order_ids:
@@ -2796,6 +2897,42 @@ def _reserve_stock_for_order(
                 change=-required,
                 movement_type=StockMovementTypeEnum.USAGE.value,
                 note=f"เบิกสำหรับออเดอร์ #{order.id}",
+            )
+        )
+        for link in ingredient.menu_links:
+            expanded_menu_items.add(link.menu_item)
+
+    _update_menu_item_availability(expanded_menu_items)
+
+
+def _release_stock_for_order(order: Order) -> None:
+    if not order.items:
+        return
+
+    menu_pairs = []
+    for item in order.items:
+        if not item.menu_item:
+            continue
+        menu_pairs.append((item.menu_item, item.quantity))
+
+    if not menu_pairs:
+        return
+
+    usage_totals, affected_menu_items = _calculate_inventory_usage(menu_pairs)
+    if not usage_totals:
+        return
+
+    expanded_menu_items = set(affected_menu_items)
+    for data in usage_totals.values():
+        ingredient: Ingredient = data["ingredient"]
+        amount = round(data["required"], 2)
+        ingredient.quantity_on_hand = float(ingredient.quantity_on_hand or 0) + amount
+        db_session.add(
+            StockMovement(
+                ingredient=ingredient,
+                change=amount,
+                movement_type=StockMovementTypeEnum.ADJUSTMENT.value,
+                note=f"คืนสต๊อกจากการยกเลิกออเดอร์ #{order.id}",
             )
         )
         for link in ingredient.menu_links:
