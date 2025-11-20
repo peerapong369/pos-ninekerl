@@ -1984,6 +1984,24 @@ def admin_delete_menu_option(item_id: int, group_id: int, option_id: int):
     return redirect(url_for("main.admin_manage_menu"))
 
 
+@main_blueprint.route("/admin/menu/items/<int:item_id>/delete", methods=["POST"])
+@login_required("adminpp")
+def admin_delete_menu_item(item_id: int):
+    menu_item = db_session.get(MenuItem, item_id)
+    if not menu_item:
+        abort(404, description="Menu item not found")
+
+    if menu_item.order_items:
+        flash("ไม่สามารถลบเมนูที่ถูกใช้ในออเดอร์แล้ว", "error")
+        return redirect(url_for("main.admin_manage_menu"))
+
+    _remove_menu_image(menu_item.image_path)
+    db_session.delete(menu_item)
+    db_session.commit()
+    flash("ลบเมนูเรียบร้อย", "success")
+    return redirect(url_for("main.admin_manage_menu"))
+
+
 @main_blueprint.route("/admin/tables")
 @login_required("admin")
 def admin_manage_tables():

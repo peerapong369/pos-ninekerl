@@ -129,6 +129,13 @@
             <button class="button button-small button-outline" type="button" data-toggle="menu-form-{{ item.id }}">
               แก้ไข
             </button>
+            {% if current_user and 'adminpp' in current_user.roles %}
+            <form method="post" action="{{ url_for('main.admin_delete_menu_item', item_id=item.id) }}" onsubmit="return confirm('ยืนยันลบเมนู {{ item.name }} หรือไม่?');">
+              <button type="submit" class="button button-small button-danger">
+                ลบเมนู
+              </button>
+            </form>
+            {% endif %}
           </td>
         </tr>
         <tr id="menu-form-{{ item.id }}" class="menu-edit-row" hidden>
