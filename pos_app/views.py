@@ -8,9 +8,11 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 import secrets
+import base64
 
 from flask import (
     Blueprint,
+    Response,
     abort,
     current_app,
     flash,
@@ -21,6 +23,7 @@ from flask import (
     send_file,
     send_from_directory,
     session,
+    stream_with_context,
     url_for,
 )
 import csv
@@ -34,6 +37,9 @@ from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from werkzeug.utils import secure_filename
+from google.cloud import texttospeech
+from google.api_core.exceptions import GoogleAPIError
+from queue import Empty
 
 from .database import db_session
 
@@ -60,6 +66,7 @@ from .models import (
 from .promptpay import build_promptpay_payload, generate_qr_base64, normalize_target
 from .auth import login_required
 from . import notifications
+from .event_stream import noodle_board_channel
 
 main_blueprint = Blueprint("main", __name__)
 
@@ -108,6 +115,15 @@ SPECIAL_MENU_CONFIG = {
         "extras": _BASE_EXTRA_OPTIONS,
     },
 }
+
+_THAI_TTS_DEFAULT_VOICES = [
+    "th-TH-Standard-A",
+    "th-TH-Standard-B",
+    "th-TH-Standard-C",
+    "th-TH-Standard-D",
+    "th-TH-Neural2-A",
+    "th-TH-Neural2-B",
+]
 
 
 def _promptpay_config() -> Tuple[str | None, str | None]:
@@ -179,6 +195,9 @@ def _store_timezone() -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
+_tts_client: texttospeech.TextToSpeechClient | None = None
+
+
 def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
     tz = _store_timezone()
     now = now or datetime.now(tz)
@@ -240,6 +259,54 @@ def _store_status(now: datetime | None = None) -> Dict[str, str | bool | None]:
         "current_time": now.strftime("%H:%M"),
         "timezone": tz.key,
     }
+
+
+def _get_tts_client() -> texttospeech.TextToSpeechClient | None:
+    global _tts_client
+    if _tts_client is not None:
+        return _tts_client
+
+    client_kwargs: Dict[str, Any] = {}
+    try:
+        endpoint = current_app.config.get("TTS_API_ENDPOINT")
+    except RuntimeError:
+        endpoint = None
+
+    if endpoint:
+        client_kwargs["client_options"] = {"api_endpoint": endpoint}
+
+    try:
+        _tts_client = texttospeech.TextToSpeechClient(**client_kwargs)
+    except GoogleAPIError as exc:
+        current_app.logger.error("TTS client error: %s", exc)
+        _tts_client = None
+    except Exception as exc:  # pragma: no cover - defensive log
+        current_app.logger.error("Unexpected TTS client error: %s", exc)
+        _tts_client = None
+    return _tts_client
+
+
+def _tts_voice_candidates() -> List[str]:
+    """Return deduplicated preferred Thai voice names in priority order."""
+    candidates: List[str] = []
+    preferred = current_app.config.get("TTS_VOICE_NAME")
+    if preferred:
+        candidates.append(preferred)
+
+    extra = current_app.config.get("TTS_VOICE_CANDIDATES") or []
+    if isinstance(extra, str):
+        extra = [voice.strip() for voice in extra.split(",") if voice.strip()]
+    candidates.extend(extra)
+    candidates.extend(_THAI_TTS_DEFAULT_VOICES)
+
+    ordered: List[str] = []
+    seen: set[str] = set()
+    for voice_name in candidates:
+        if not voice_name or voice_name in seen:
+            continue
+        seen.add(voice_name)
+        ordered.append(voice_name)
+    return ordered
 
 
 def _parse_order_item_details(note: str | None) -> Dict[str, str]:
@@ -562,19 +629,37 @@ def kitchen_orders_board():
 @main_blueprint.route("/api/kitchen/noodle-orders")
 @login_required("kitchen")
 def api_noodle_orders():
-    payload = []
-    for order, items in _collect_noodle_orders():
-        payload.append(
-            {
-                "id": order.id,
-                "table": order.table.name if order.table else "-",
-                "status": order.status,
-                "status_label": STATUS_LABELS.get(order.status, order.status),
-                "created_at": order.created_at.isoformat(),
-                "items": items,
+    return jsonify({"orders": _noodle_orders_payload()})
+
+
+@main_blueprint.route("/api/kitchen/noodle-stream")
+@login_required("kitchen")
+def api_noodle_orders_stream():
+    def event_stream():
+        listener = noodle_board_channel.listen()
+        try:
+            initial = {
+                "orders": _noodle_orders_payload(),
+                "timestamp": datetime.utcnow().isoformat(),
             }
-        )
-    return jsonify({"orders": payload})
+            yield f"data: {json.dumps(initial)}\n\n"
+            while True:
+                try:
+                    message = listener.get(timeout=25)
+                except Empty:
+                    yield "event: ping\ndata: keep-alive\n\n"
+                    continue
+                yield f"data: {json.dumps(message)}\n\n"
+        finally:
+            noodle_board_channel.remove(listener)
+
+    response = Response(
+        stream_with_context(event_stream()),
+        mimetype="text/event-stream",
+    )
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
 
 
 @main_blueprint.route("/api/menu")
@@ -612,6 +697,52 @@ def api_menu():
 def api_game_config():
     target = _get_game_target()
     return jsonify({"target_squeezes": target})
+
+
+@main_blueprint.route("/api/tts")
+@login_required("kitchen")
+def api_text_to_speech():
+    text = request.args.get("text", "").strip()
+    if not text:
+        return jsonify({"message": "กรุณาระบุข้อความ"}), 400
+    if len(text) > 220:
+        text = text[:220]
+
+    client = _get_tts_client()
+    if not client:
+        return jsonify({"message": "ยังไม่ได้ตั้งค่า Google TTS"}), 500
+
+    synthesis_input = texttospeech.SynthesisInput(text=text)
+    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+
+    candidates = _tts_voice_candidates()
+    if not candidates:
+        candidates = _THAI_TTS_DEFAULT_VOICES
+
+    response = None
+    last_error = None
+    for voice_name in candidates:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code="th-TH",
+            name=voice_name,
+        )
+        try:
+            response = client.synthesize_speech(
+                input=synthesis_input,
+                voice=voice,
+                audio_config=audio_config,
+            )
+            break
+        except GoogleAPIError as exc:
+            current_app.logger.error("TTS error for %s: %s", voice_name, exc)
+            last_error = exc
+            continue
+
+    if not response:
+        return jsonify({"message": "ไม่สามารถสร้างเสียงได้"}), 500
+
+    audio_base64 = base64.b64encode(response.audio_content).decode("utf-8")
+    return jsonify({"audio": f"data:audio/mp3;base64,{audio_base64}"})
 
 
 @main_blueprint.route("/api/orders", methods=["POST"])
@@ -701,6 +832,7 @@ def api_create_order():
     db_session.refresh(order)
 
     notifications.notify_new_order(order)
+    _broadcast_noodle_orders()
 
     formatted = _order_to_dict(order)
     return jsonify(formatted), 201
@@ -754,6 +886,7 @@ def api_update_order_status(order_id: int):
             order.paid_at = datetime.utcnow()
         _ensure_invoice(order)
     db_session.commit()
+    _broadcast_noodle_orders()
 
     return jsonify(_order_to_dict(order))
 
@@ -1260,6 +1393,7 @@ def admin_cancel_order(table_code: str, order_id: int):
     _release_stock_for_order(order)
     db_session.delete(order)
     db_session.commit()
+    _broadcast_noodle_orders()
     flash(f"ยกเลิกออเดอร์ #{order.id} เรียบร้อย", "success")
     return redirect(url_for("main.admin_billing_table_view", table_code=table.code))
 
@@ -2160,6 +2294,7 @@ def _build_table_menu_url(table_code: str) -> str:
 def admin_reset_data():
     try:
         seed_sample_data(force=True)
+        _broadcast_noodle_orders()
         flash("ล้างข้อมูลทั้งหมดและสร้างโต๊ะเริ่มต้นเรียบร้อย", "success")
     except Exception as exc:  # pragma: no cover - defensive
         db_session.rollback()
@@ -2655,6 +2790,44 @@ def _collect_noodle_orders() -> List[tuple[Order, List[Dict[str, Any]]]]:
         if noodle_items:
             result.append((order, noodle_items))
     return result
+
+
+def _noodle_orders_payload() -> List[Dict[str, Any]]:
+    payload: List[Dict[str, Any]] = []
+    for order, items in _collect_noodle_orders():
+        payload.append(
+            {
+                "id": order.id,
+                "table": order.table.name if order.table else "-",
+                "table_code": order.table.code if order.table else "",
+                "status": order.status,
+                "status_label": STATUS_LABELS.get(order.status, order.status),
+                "status_hint": STATUS_HINTS.get(order.status, ""),
+                "created_at": order.created_at.isoformat(),
+                "items": items,
+                "grand_total": order.grand_total,
+                "amount_paid": order.amount_paid,
+                "balance_due": order.balance_due,
+            }
+        )
+    return payload
+
+
+def _broadcast_noodle_orders() -> None:
+    logger = None
+    try:
+        logger = current_app.logger  # type: ignore[attr-defined]
+    except RuntimeError:
+        logger = None
+    try:
+        payload = {
+            "orders": _noodle_orders_payload(),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        noodle_board_channel.publish(payload)
+    except Exception:
+        if logger:
+            logger.exception("Failed to broadcast noodle orders")
 
 
 def _backfill_invoices(order_ids: List[int] | None = None) -> None:

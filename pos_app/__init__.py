@@ -32,6 +32,13 @@ def create_app():
         LINE_CHANNEL_SECRET=os.getenv("LINE_CHANNEL_SECRET"),
         TABLE_MENU_BASE_URL=os.getenv("TABLE_MENU_BASE_URL"),
         STORE_TIMEZONE=os.getenv("STORE_TIMEZONE", "Asia/Bangkok"),
+        TTS_VOICE_NAME=os.getenv("TTS_VOICE_NAME"),
+        TTS_VOICE_CANDIDATES=[
+            voice.strip()
+            for voice in os.getenv("TTS_VOICE_CANDIDATES", "").split(",")
+            if voice.strip()
+        ],
+        TTS_API_ENDPOINT=os.getenv("TTS_API_ENDPOINT"),
     )
 
     upload_dir = BASE_DIR / "static" / "uploads" / "menu"

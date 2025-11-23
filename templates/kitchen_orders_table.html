@@ -4,14 +4,15 @@
 
 {% block content %}
 <section class="panel">
-  <div class="panel-header">
-    <h2>บอร์ดออเดอร์ก๋วยเตี๋ยว</h2>
-    <div class="panel-header-actions">
-      <button class="button button-outline" id="fontDown">A-</button>
-      <button class="button button-outline" id="fontUp">A+</button>
-      <a class="button" href="{{ url_for('main.kitchen_dashboard') }}">กลับหน้าแสดงผลหน้าหลัก</a>
+    <div class="panel-header">
+      <h2>บอร์ดออเดอร์ก๋วยเตี๋ยว</h2>
+      <div class="panel-header-actions">
+        <button class="button button-outline" id="soundToggle">ปิดเสียง</button>
+        <button class="button button-outline" id="fontDown">A-</button>
+        <button class="button button-outline" id="fontUp">A+</button>
+        <a class="button" href="{{ url_for('main.kitchen_dashboard') }}">กลับหน้าแสดงผลหน้าหลัก</a>
+      </div>
     </div>
-  </div>
   {% if not orders %}
   <p>ยังไม่มีออเดอร์ก๋วยเตี๋ยวในขณะนี้</p>
   {% else %}
@@ -88,9 +89,11 @@
 <script>
   (function() {
     const table = document.getElementById("ordersTable");
+    const soundToggle = document.getElementById("soundToggle");
     const down = document.getElementById("fontDown");
     const up = document.getElementById("fontUp");
     let size = 1;
+    let soundEnabled = true;
     function refresh() {
       if (table) {
         table.style.fontSize = `${size}rem`;
@@ -111,16 +114,85 @@
     refresh();
 
     const body = document.getElementById("ordersBody");
-    async function fetchOrders() {
+    const seenOrders = new Map();
+    let initialized = false;
+
+    function updateSoundToggleLabel() {
+      if (!soundToggle) return;
+      soundToggle.textContent = soundEnabled ? "ปิดเสียง" : "เปิดเสียง";
+      soundToggle.setAttribute("aria-pressed", soundEnabled ? "true" : "false");
+    }
+
+    if (soundToggle) {
+      soundToggle.addEventListener("click", () => {
+        soundEnabled = !soundEnabled;
+        updateSoundToggleLabel();
+      });
+      updateSoundToggleLabel();
+    }
+
+    function handleOrdersPayload(orders) {
+      if (!Array.isArray(orders)) {
+        return;
+      }
+      if (!initialized) {
+        orders.forEach((entry) => seenOrders.set(entry.id, true));
+        initialized = true;
+      } else {
+        syncNewOrders(orders);
+      }
+      renderOrders(orders);
+    }
+
+    function syncNewOrders(orders) {
+      const activeIds = new Set();
+      orders.forEach((entry) => {
+        activeIds.add(entry.id);
+        if (!seenOrders.has(entry.id)) {
+          seenOrders.set(entry.id, true);
+          speakOrder(entry);
+        }
+      });
+      Array.from(seenOrders.keys()).forEach((id) => {
+        if (!activeIds.has(id)) {
+          seenOrders.delete(id);
+        }
+      });
+    }
+
+    async function speakOrder(entry) {
+      if (!soundEnabled) {
+        return;
+      }
+      const items = (entry.items || []).map((item) => {
+        const parts = [`${item.quantity} ${item.name}`];
+        if (item.noodle) {
+          parts.push(`เส้น ${item.noodle}`);
+        }
+        parts.push(item.extras ? item.extras : "ธรรมดา");
+        if (item.other) {
+          parts.push(item.other);
+        }
+        return parts.join(", ");
+      });
+      const message = `ออเดอร์โต๊ะ ${entry.table} ${items.join(" | ")}`;
       try {
-        const response = await fetch("/api/kitchen/noodle-orders");
+        const response = await fetch(`/api/tts?text=${encodeURIComponent(message)}`);
         if (!response.ok) {
-          return;
+          throw new Error("tts");
         }
         const data = await response.json();
-        renderOrders(data.orders || []);
+        if (data.audio) {
+          const audio = new Audio(data.audio);
+          audio.play();
+          return;
+        }
       } catch (error) {
-        console.error(error);
+        if (window.speechSynthesis) {
+          const utterance = new SpeechSynthesisUtterance(message);
+          utterance.lang = "th-TH";
+          window.speechSynthesis.speak(utterance);
+        }
       }
     }
 
@@ -158,8 +230,41 @@
         .join("");
     }
 
-    fetchOrders();
-    setInterval(fetchOrders, 5000);
+    function startStream(retryDelay = 0) {
+      if (!("EventSource" in window)) {
+        fetchFallback();
+        return;
+      }
+      setTimeout(() => {
+        const source = new EventSource("/api/kitchen/noodle-stream");
+        window.__noodleStream = source;
+        source.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            handleOrdersPayload(payload.orders || []);
+          } catch (error) {
+            console.error("stream parse failed", error);
+          }
+        };
+        source.addEventListener("ping", () => {});
+        source.onerror = () => {
+          source.close();
+          setTimeout(() => startStream(2000), 2000);
+        };
+      }, retryDelay);
+    }
+
+    function fetchFallback() {
+      fetch("/api/kitchen/noodle-orders")
+        .then((response) => response.json())
+        .then((data) => {
+          handleOrdersPayload(data.orders || []);
+          setTimeout(fetchFallback, 5000);
+        })
+        .catch(() => setTimeout(fetchFallback, 5000));
+    }
+
+    startStream();
   })();
 </script>
 {% endblock %}
